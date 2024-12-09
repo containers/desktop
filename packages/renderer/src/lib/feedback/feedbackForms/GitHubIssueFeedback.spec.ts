@@ -310,5 +310,4 @@ test.each(['bug', 'feature'])('Expect %s to have specific telemetry track events
   await vi.waitFor(() =>
     expect(window.telemetryTrack).toHaveBeenNthCalledWith(2, `feedback.${category}FormSubmitteds`),
   );
->>>>>>> fd1c1335e (chore: add telemetry events to GitHubIssue feedback forms)
 });
