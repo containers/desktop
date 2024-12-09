@@ -35,6 +35,7 @@ beforeAll(() => {
     value: {
       openExternal: openExternalMock,
       previewOnGitHub: previewOnGitHubMock,
+      telemetryTrack: vi.fn(),
       navigator: {
         clipboard: {
           writeText: vi.fn(),
@@ -244,6 +245,7 @@ describe('includeSystemInfo', () => {
   });
 });
 
+<<<<<<< HEAD
 describe('includeExtensionInfo', () => {
   test('should not be visible on category feature', async () => {
     const { includeExtensionInfo } = renderGitHubIssueFeedback({
@@ -291,4 +293,22 @@ describe('includeExtensionInfo', () => {
       }),
     );
   });
+=======
+test.each(['bug', 'feature'])('Expect %s to have specific telemetry track events', async category => {
+  const { title, description, preview } = renderGitHubIssueFeedback({
+    category: category,
+    onCloseForm: vi.fn(),
+    contentChange: vi.fn(),
+  });
+
+  expect(window.telemetryTrack).toHaveBeenNthCalledWith(1, `feedback.${category}FormOpened`);
+
+  await userEvent.type(title, 'Bug title');
+  await userEvent.type(description, 'Bug description');
+  await userEvent.click(preview);
+
+  await vi.waitFor(() =>
+    expect(window.telemetryTrack).toHaveBeenNthCalledWith(2, `feedback.${category}FormSubmitteds`),
+  );
+>>>>>>> fd1c1335e (chore: add telemetry events to GitHubIssue feedback forms)
 });
