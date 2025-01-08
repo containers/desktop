@@ -55,21 +55,24 @@ import {
   CustomObjectsApi,
   Exec,
   FetchError,
+  Health,
   KubeConfig,
   KubernetesObjectApi,
   Log,
   NetworkingV1Api,
-  VersionApi,
   Watch,
 } from '@kubernetes/client-node';
 import { PromiseMiddlewareWrapper } from '@kubernetes/client-node/dist/gen/middleware.js';
 import type * as containerDesktopAPI from '@podman-desktop/api';
 import * as jsYaml from 'js-yaml';
+import type { WebSocket } from 'ws';
 import { parseAllDocuments } from 'yaml';
 
 import type { KubernetesPortForwardService } from '/@/plugin/kubernetes/kubernetes-port-forward-service.js';
 import { KubernetesPortForwardServiceProvider } from '/@/plugin/kubernetes/kubernetes-port-forward-service.js';
 import type { KubeContext } from '/@api/kubernetes-context.js';
+import type { ContextHealth } from '/@api/kubernetes-contexts-healths.js';
+import type { ContextPermission } from '/@api/kubernetes-contexts-permissions.js';
 import type { ContextGeneralState, ResourceName } from '/@api/kubernetes-contexts-states.js';
 import type { ForwardConfig, ForwardOptions } from '/@api/kubernetes-port-forward-model.js';
 import type { V1Route } from '/@api/openshift-types.js';
@@ -84,7 +87,12 @@ import { Uri } from '../types/uri.js';
 import { ContextsManager } from './contexts-manager.js';
 import { ContextsManagerExperimental } from './contexts-manager-experimental.js';
 import { ContextsStatesDispatcher } from './contexts-states-dispatcher.js';
-import { BufferedStreamWriter, ResizableTerminalWriter, StringLineReader } from './kubernetes-exec-transmitter.js';
+import {
+  BufferedStreamWriter,
+  ExecStreamWriter,
+  ResizableTerminalWriter,
+  StringLineReader,
+} from './kubernetes-exec-transmitter.js';
 
 interface ContextsManagerInterface {
   // indicate to the manager that the kubeconfig has changed
@@ -153,6 +161,8 @@ const DEFAULT_NAMESPACE = 'default';
 
 const FIELD_MANAGER = 'podman-desktop';
 
+const CHECK_CONNECTION_TIMEOUT_MS = 1_000;
+
 const SCALABLE_CONTROLLER_TYPES = ['Deployment', 'ReplicaSet', 'StatefulSet'];
 export type ScalableControllerType = (typeof SCALABLE_CONTROLLER_TYPES)[number];
 export type ControllerType = ScalableControllerType | 'Job' | 'DaemonSet' | 'CronJob' | undefined;
@@ -202,6 +212,11 @@ export class KubernetesClient {
   static readonly portForwardServiceProvider = new KubernetesPortForwardServiceProvider();
 
   #portForwardService?: KubernetesPortForwardService;
+
+  #execs: Map<
+    string,
+    { stdout: ExecStreamWriter; stderr: ExecStreamWriter; stdin: StringLineReader; conn: WebSocket }
+  > = new Map();
 
   constructor(
     private readonly apiSender: ApiSenderType,
@@ -259,7 +274,7 @@ export class KubernetesClient {
     if (statesExperimental) {
       const manager = new ContextsManagerExperimental();
       this.contextsState = manager;
-      this.contextsStatesDispatcher = new ContextsStatesDispatcher(manager);
+      this.contextsStatesDispatcher = new ContextsStatesDispatcher(manager, this.apiSender);
       this.contextsStatesDispatcher.init();
     }
 
@@ -536,6 +551,8 @@ export class KubernetesClient {
     this.setupKubeWatcher();
     this.apiResources.clear();
     this.#portForwardService?.dispose();
+    this.#execs.forEach(entry => entry.conn.close());
+    this.#execs.clear();
     this.#portForwardService = KubernetesClient.portForwardServiceProvider.getService(this, this.apiSender);
     await this.fetchAPIGroups();
     this.apiSender.send('pod-event');
@@ -637,42 +654,6 @@ export class KubernetesClient {
     return [];
   }
 
-  // List all deployments
-  async listDeployments(): Promise<V1Deployment[]> {
-    const namespace = this.getCurrentNamespace();
-    // Only retrieve deployments if valid namespace && valid connection, otherwise we will return an empty array
-    const connected = await this.checkConnection();
-    if (namespace && connected) {
-      // Get the deployments via the kubernetes api
-      try {
-        const k8sAppsApi = this.kubeConfig.makeApiClient(AppsV1Api);
-        const deployments = await k8sAppsApi.listNamespacedDeployment({ namespace });
-        return deployments.items;
-      } catch (_) {
-        // do nothing
-      }
-    }
-    return [];
-  }
-
-  // List all ingresses
-  async listIngresses(): Promise<V1Ingress[]> {
-    const namespace = this.getCurrentNamespace();
-    // Only retrieve ingresses if valid namespace && valid connection, otherwise we will return an empty array
-    const connected = await this.checkConnection();
-    if (namespace && connected) {
-      // Get the ingresses via the kubernetes api
-      try {
-        const k8sNetworkingApi = this.kubeConfig.makeApiClient(NetworkingV1Api);
-        const ingresses = await k8sNetworkingApi.listNamespacedIngress({ namespace });
-        return ingresses.items;
-      } catch (_) {
-        // do nothing
-      }
-    }
-    return [];
-  }
-
   // List all routes
   async listRoutes(): Promise<V1Route[]> {
     const namespace = this.getCurrentNamespace();
@@ -692,24 +673,6 @@ export class KubernetesClient {
         return body.items;
       } catch (_) {
         // catch 404 error
-        // do nothing
-      }
-    }
-    return [];
-  }
-
-  // List all services
-  async listServices(): Promise<V1Service[]> {
-    const namespace = this.getCurrentNamespace();
-    // Only retrieve services if valid namespace && valid connection, otherwise we will return an empty array
-    const connected = await this.checkConnection();
-    if (namespace && connected) {
-      // Get the services via the kubernetes api
-      try {
-        const k8sApi = this.kubeConfig.makeApiClient(CoreV1Api);
-        const services = await k8sApi.listNamespacedService({ namespace });
-        return services.items;
-      } catch (_) {
         // do nothing
       }
     }
@@ -1027,14 +990,12 @@ export class KubernetesClient {
   }
 
   // Check that we can connect to the cluster and return a Promise<boolean> of true or false depending on the result.
-  // We will check via trying to retrieve a list of API Versions from the server.
+  // We will check via the health check on the cluster of the current context, with a short timeout.
   async checkConnection(): Promise<boolean> {
     try {
-      const k8sApi = this.kubeConfig.makeApiClient(VersionApi);
-      // getCode will error out if we're unable to connect to the cluster
-      await k8sApi.getCode();
-      return true;
-    } catch (error) {
+      const health = new Health(this.kubeConfig);
+      return await health.readyz({ timeout: CHECK_CONNECTION_TIMEOUT_MS });
+    } catch {
       return false;
     }
   }
@@ -1065,95 +1026,6 @@ export class KubernetesClient {
     this.kubeConfigWatcher?.dispose();
   }
 
-  /**
-   * Convert a apiVersion value to an object with group and version field.
-   *
-   * @param apiVersion the apiVersion field from payload
-   */
-  groupAndVersion(apiVersion: string): { group: string; version: string } {
-    const v = apiVersion.split('/');
-    if (v.length === 1 && v[0]) {
-      return { group: '', version: v[0] };
-    } else if (v.length > 1 && v[0] && v[1]) {
-      return { group: v[0], version: v[1] };
-    }
-    throw new Error(`Invalid apiVersion: ${apiVersion}`);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  createV1Resource(client: CoreV1Api, manifest: any, optionalNamespace?: string): Promise<any> {
-    if (manifest.kind === 'Namespace') {
-      return client.createNamespace(manifest);
-    } else if (manifest.kind === 'Pod') {
-      return client.createNamespacedPod(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'Service') {
-      return client.createNamespacedService(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'Binding') {
-      return client.createNamespacedBinding(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'Event') {
-      return client.createNamespacedEvent(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'Endpoints') {
-      return client.createNamespacedEndpoints(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'ConfigMap') {
-      return client.createNamespacedConfigMap(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'LimitRange') {
-      return client.createNamespacedLimitRange(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'PersistentVolumeClaim') {
-      return client.createNamespacedPersistentVolumeClaim(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'PodBinding') {
-      return client.createNamespacedPodBinding({
-        name: manifest.metadata.name,
-        namespace: optionalNamespace ?? manifest.metadata.namespace,
-        body: manifest,
-      });
-    } else if (manifest.kind === 'PodEviction') {
-      return client.createNamespacedPodEviction({
-        name: manifest.metadata.name,
-        namespace: optionalNamespace ?? manifest.metadata.namespace,
-        body: manifest,
-      });
-    } else if (manifest.kind === 'PodTemplate') {
-      return client.createNamespacedPodTemplate(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'ReplicationController') {
-      return client.createNamespacedReplicationController(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'ResourceQuota') {
-      return client.createNamespacedResourceQuota(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'Secret') {
-      return client.createNamespacedSecret(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'ServiceAccount') {
-      return client.createNamespacedServiceAccount(optionalNamespace ?? manifest.metadata.namespace, manifest);
-    } else if (manifest.kind === 'ServiceAccountToken') {
-      return client.createNamespacedServiceAccountToken({
-        name: manifest.metadata.name,
-        namespace: optionalNamespace ?? manifest.metadata.namespace,
-        body: manifest,
-      });
-    }
-    return Promise.reject(new Error(`Unsupported kind ${manifest.kind}`));
-  }
-
-  createCustomResource(
-    client: CustomObjectsApi,
-    group: string,
-    version: string,
-    plural: string,
-    namespace: string | undefined,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    manifest: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<any> {
-    if (namespace) {
-      return client.createNamespacedCustomObject({ group, version, namespace, plural, body: manifest });
-    } else {
-      return client.createClusterCustomObject({
-        group,
-        version,
-        plural: manifest.kind.toLowerCase() + 's',
-        body: manifest,
-      });
-    }
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getTags(tags: any[]): any[] {
     for (const tag of tags) {
@@ -1167,32 +1039,6 @@ export class KubernetesClient {
       }
     }
     return tags;
-  }
-
-  async getAPIResource(
-    client: CustomObjectsApi,
-    apiGroup: { group: string; version: string },
-    kind: string,
-  ): Promise<V1APIResource> {
-    let apiResources = this.apiResources.get(apiGroup.group + '/' + apiGroup.version);
-    if (!apiResources) {
-      const response = await client.listClusterCustomObject({
-        group: apiGroup.group,
-        version: apiGroup.version,
-        plural: '',
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      apiResources = (response.body as any).resources;
-      this.apiResources.set(apiGroup.group + '/' + apiGroup.version, apiResources as V1APIResource[]);
-    }
-    if (apiResources) {
-      for (const apiResource of apiResources) {
-        if (apiResource.kind === kind) {
-          return apiResource;
-        }
-      }
-    }
-    throw new Error(`Unable to find API resource for ${apiGroup.group}/${apiGroup.version}/${kind}`);
   }
 
   // load yaml file and extract manifests
@@ -1443,63 +1289,80 @@ export class KubernetesClient {
     onStdErr: (data: Buffer) => void,
     onClose: () => void,
   ): Promise<{ onStdIn: (data: string) => void; onResize: (columns: number, rows: number) => void }> {
-    let telemetryOptions = {};
-    try {
-      const ns = this.getCurrentNamespace();
-      const connected = await this.checkConnection();
-      if (!ns) {
-        throw new Error('no active namespace');
-      }
-      if (!connected) {
-        throw new Error('not active connection');
-      }
-
-      const stdout = new ResizableTerminalWriter(new BufferedStreamWriter(onStdOut));
-      const stderr = new ResizableTerminalWriter(new BufferedStreamWriter(onStdErr));
-      const stdin = new StringLineReader();
-
-      const exec = new Exec(this.kubeConfig);
-      const conn = await exec.exec(
-        ns,
-        podName,
-        containerName,
-        ['/bin/sh', '-c', 'if command -v bash >/dev/null 2>&1; then bash; else sh; fi'],
-        stdout,
-        stderr,
-        stdin,
-        true,
-        (_: V1Status) => {
-          // need to think, maybe it would be better to pass exit code to the client, but on the other hand
-          // if connection is idle for 15 minutes, websocket connection closes automatically and this handler
-          // does not call. also need to separate SIGTERM signal (143) and normally exit signals to be able to
-          // proper reconnect client terminal. at this moment we ignore status and rely on websocket close event
-        },
-      );
-
-      //need to handle websocket idling, which causes the connection close which is not passed to the execution status
-      //approx time for idling before closing socket is 15 minutes. code and reason are always undefined here.
-      conn.on('close', () => {
+    let stdin: StringLineReader;
+    let stdout: ExecStreamWriter;
+    let stderr: ExecStreamWriter;
+    const entry = this.#execs.get(`${podName}-${containerName}`);
+    if (entry) {
+      stdin = entry.stdin;
+      stdout = entry.stdout;
+      stdout.delegate = new ResizableTerminalWriter(new BufferedStreamWriter(onStdOut));
+      stderr = entry.stderr;
+      stderr.delegate = new ResizableTerminalWriter(new BufferedStreamWriter(onStdErr));
+      entry.conn.on('close', () => {
         onClose();
       });
+    } else {
+      let telemetryOptions = {};
+      try {
+        const ns = this.getCurrentNamespace();
+        const connected = await this.checkConnection();
+        if (!ns) {
+          throw new Error('no active namespace');
+        }
+        if (!connected) {
+          throw new Error('not active connection');
+        }
 
-      return {
-        onStdIn: (data: string): void => {
-          stdin.readLine(data);
-        },
-        onResize: (columns: number, rows: number): void => {
-          if (columns <= 0 || rows <= 0 || isNaN(columns) || isNaN(rows) || columns === Infinity || rows === Infinity) {
-            throw new Error('resizing must be done using positive cols and rows');
-          }
+        stdout = new ExecStreamWriter(new ResizableTerminalWriter(new BufferedStreamWriter(onStdOut)));
+        stderr = new ExecStreamWriter(new ResizableTerminalWriter(new BufferedStreamWriter(onStdErr)));
+        stdin = new StringLineReader();
 
-          (stdout as ResizableTerminalWriter).resize({ width: columns, height: rows });
-        },
-      };
-    } catch (error) {
-      telemetryOptions = { error: error };
-      throw this.wrapK8sClientError(error);
-    } finally {
-      this.telemetry.track('kubernetesExecIntoContainer', telemetryOptions);
+        const exec = new Exec(this.kubeConfig);
+        const conn = await exec.exec(
+          ns,
+          podName,
+          containerName,
+          ['/bin/sh', '-c', 'if command -v bash >/dev/null 2>&1; then bash; else sh; fi'],
+          stdout,
+          stderr,
+          stdin,
+          true,
+          (_: V1Status) => {
+            // need to think, maybe it would be better to pass exit code to the client, but on the other hand
+            // if connection is idle for 15 minutes, websocket connection closes automatically and this handler
+            // does not call. also need to separate SIGTERM signal (143) and normally exit signals to be able to
+            // proper reconnect client terminal. at this moment we ignore status and rely on websocket close event
+          },
+        );
+
+        //need to handle websocket idling, which causes the connection close which is not passed to the execution status
+        //approx time for idling before closing socket is 15 minutes. code and reason are always undefined here.
+        conn.on('close', () => {
+          onClose();
+          this.#execs.delete(`${podName}-${containerName}`);
+        });
+        this.#execs.set(`${podName}-${containerName}`, { stdin, stdout, stderr, conn });
+      } catch (error) {
+        telemetryOptions = { error: error };
+        throw this.wrapK8sClientError(error);
+      } finally {
+        this.telemetry.track('kubernetesExecIntoContainer', telemetryOptions);
+      }
     }
+
+    return {
+      onStdIn: (data: string): void => {
+        stdin.readLine(data);
+      },
+      onResize: (columns: number, rows: number): void => {
+        if (columns <= 0 || rows <= 0 || isNaN(columns) || isNaN(rows) || columns === Infinity || rows === Infinity) {
+          throw new Error('resizing must be done using positive cols and rows');
+        }
+
+        ((stdout as ExecStreamWriter).delegate as ResizableTerminalWriter).resize({ width: columns, height: rows });
+      },
+    };
   }
 
   async restartPod(name: string): Promise<void> {
@@ -1813,5 +1676,19 @@ export class KubernetesClient {
 
   public async deletePortForward(config: ForwardConfig): Promise<void> {
     return this.ensurePortForwardService().deleteForward(config);
+  }
+
+  public getContextsHealths(): ContextHealth[] {
+    if (!this.contextsStatesDispatcher) {
+      throw new Error('contextsStatesDispatcher is undefined. This should not happen in Kubernetes experimental');
+    }
+    return this.contextsStatesDispatcher?.getContextsHealths();
+  }
+
+  public getContextsPermissions(): ContextPermission[] {
+    if (!this.contextsStatesDispatcher) {
+      throw new Error('contextsStatesDispatcher is undefined. This should not happen in Kubernetes experimental');
+    }
+    return this.contextsStatesDispatcher.getContextsPermissions();
   }
 }

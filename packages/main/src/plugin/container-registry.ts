@@ -30,7 +30,7 @@ import type { ContainerAttachOptions, ImageBuildOptions } from 'dockerode';
 import Dockerode from 'dockerode';
 import moment from 'moment';
 import StreamValues from 'stream-json/streamers/StreamValues.js';
-import type { Pack, PackOptions } from 'tar-fs';
+import type { Headers, Pack, PackOptions } from 'tar-fs';
 
 import type { ProviderRegistry } from '/@/plugin/provider-registry.js';
 import type {
@@ -70,6 +70,7 @@ import type {
   LibPod,
   PlayKubeInfo,
   PodInfo as LibpodPodInfo,
+  PodmanDevice,
 } from './dockerode/libpod-dockerode.js';
 import { LibpodDockerode } from './dockerode/libpod-dockerode.js';
 import { EnvfileParser } from './env-file-parser.js';
@@ -670,7 +671,7 @@ export class ContainerProviderRegistry {
     return images.flat();
   }
 
-  async pruneImages(engineId: string): Promise<void> {
+  async pruneImages(engineId: string, all: boolean): Promise<void> {
     // We have to use two different API calls for pruning images, because the Podman API does not respect the 'dangling' filter
     // and instead uses 'all' and 'external'. See: https://github.com/containers/podman/issues/11576
     // so for Dockerode we'll have to call pruneImages with the 'dangling' filter, and for Podman we'll have to call pruneImages
@@ -682,13 +683,13 @@ export class ContainerProviderRegistry {
     try {
       const provider = this.internalProviders.get(engineId);
       if (provider?.libpodApi) {
-        await provider.libpodApi.pruneAllImages(true);
+        await provider.libpodApi.pruneAllImages(all);
         return;
       }
 
       // DOCKER:
       // Return Promise<void> for this call, because Dockerode does not return anything
-      await this.getMatchingEngine(engineId).pruneImages({ filters: { dangling: { false: true } } });
+      await this.getMatchingEngine(engineId).pruneImages({ filters: { dangling: { false: all } } });
     } catch (error) {
       telemetryOptions = { error: error };
       throw error;
@@ -1940,7 +1941,18 @@ export class ContainerProviderRegistry {
     let telemetryOptions = {};
     try {
       let container: Dockerode.Container;
-      if (options.pod) {
+      let forceLibPod = false;
+
+      // the device option requesting an nvidia gpu on linux only works
+      // if the LibPod API is used. Check if such a device is requested
+      // and if so force the use of LibPod
+      for (const device of options.HostConfig?.Devices ?? []) {
+        if (device.PathOnHost === 'nvidia.com/gpu=all') {
+          forceLibPod = true;
+          break;
+        }
+      }
+      if (options.pod ?? forceLibPod) {
         container = await this.createContainerLibPod(engineId, options);
       } else {
         container = await this.createContainerDockerode(engineId, options);
@@ -2034,11 +2046,14 @@ export class ContainerProviderRegistry {
 
     let seccomp_policy: string | undefined;
     let seccomp_profile_path: string | undefined;
+    const selinux_opts: Array<string> = [];
     for (const secOpt of options.HostConfig?.SecurityOpt ?? []) {
       if (secOpt === 'empty' || secOpt === 'default' || secOpt === 'image') {
         seccomp_policy = secOpt;
       } else if (secOpt.startsWith('seccomp=')) {
         seccomp_profile_path = secOpt.substring(8).trim();
+      } else if (secOpt.startsWith('label=')) {
+        selinux_opts.push(secOpt.substring(6).trim());
       }
     }
 
@@ -2071,10 +2086,18 @@ export class ContainerProviderRegistry {
       }
     }
 
+    let updatedDevices: Array<PodmanDevice> | undefined;
+    if (options.HostConfig?.Devices) {
+      updatedDevices = [];
+      for (const device of options.HostConfig?.Devices ?? []) {
+        updatedDevices.push({ path: device.PathOnHost });
+      }
+    }
+
     const podmanOptions: PodmanContainerCreateOptions = {
       name: options.name,
       command: options.Cmd,
-      entrypoint: options.Entrypoint,
+      entrypoint: !options.Entrypoint || Array.isArray(options.Entrypoint) ? options.Entrypoint : [options.Entrypoint],
       env: updatedEnv,
       pod: options.pod,
       hostname: options.Hostname,
@@ -2091,6 +2114,7 @@ export class ContainerProviderRegistry {
       remove: options.HostConfig?.AutoRemove,
       seccomp_policy: seccomp_policy,
       seccomp_profile_path: seccomp_profile_path,
+      selinux_opts: selinux_opts,
       cap_add: options.HostConfig?.CapAdd,
       cap_drop: options.HostConfig?.CapDrop,
       privileged: options.HostConfig?.Privileged,
@@ -2099,6 +2123,7 @@ export class ContainerProviderRegistry {
       dns_server: dns_server,
       hostadd: options.HostConfig?.ExtraHosts,
       userns: options.HostConfig?.UsernsMode,
+      devices: updatedDevices,
     };
 
     const container = await engine.libpodApi.createPodmanContainer(podmanOptions);
@@ -2438,6 +2463,12 @@ export class ContainerProviderRegistry {
       }
 
       let tarStream: NodeJS.ReadableStream;
+      const overrideIds = (fileHeader: Headers): Headers => {
+        // change ownership to root/root for https://github.com/podman-desktop/podman-desktop/issues/3444
+        fileHeader.uid = 0;
+        fileHeader.gid = 0;
+        return fileHeader;
+      };
       if (options?.containerFile?.startsWith('../')) {
         // If containerfile is outside the context, we add it to the tar archive, without overriding an existing one
         const containerFileContent = await readFile(path.join(containerBuildContextDirectory, options.containerFile));
@@ -2448,13 +2479,16 @@ export class ContainerProviderRegistry {
         options.containerFile = `./Containerfile.${i}`;
         tarStream = tar.pack(containerBuildContextDirectory, {
           finalize: false,
+          map: overrideIds,
           finish(myStream: Pack) {
             myStream.entry({ name: `Containerfile.${i}` }, containerFileContent);
             myStream.finalize();
           },
         });
       } else {
-        tarStream = tar.pack(containerBuildContextDirectory);
+        tarStream = tar.pack(containerBuildContextDirectory, {
+          map: overrideIds,
+        });
       }
 
       let streamingPromise: NodeJS.ReadableStream;
@@ -2504,7 +2538,7 @@ export class ContainerProviderRegistry {
         eventCollect('error', errorMessage);
         throw error;
       }
-      eventCollect('stream', `Building ${options?.tag}...\r\n`);
+      eventCollect('stream', `Building image ${options?.tag ?? ''}...\r\n`);
       // eslint-disable-next-line @typescript-eslint/no-empty-object-type
       let resolve: (output: {}) => void;
       let reject: (err: Error) => void;

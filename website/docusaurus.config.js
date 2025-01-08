@@ -105,6 +105,10 @@ const config = {
             from: '/docs/onboarding-for-kubernetes',
           },
           {
+            to: '/docs/kubernetes/deploying-a-pod-to-kubernetes',
+            from: '/docs/kubernetes/deploying-a-container-to-kubernetes',
+          },
+          {
             to: '/docs/containers/onboarding',
             from: ['/docs/onboarding-for-containers', '/docs/onboarding', '/docs/onboarding/containers'],
           },
@@ -357,7 +361,7 @@ const config = {
         docs: {
           sidebarCollapsed: false,
           sidebarPath: require.resolve('./sidebars.js'),
-          editUrl: 'https://github.com/containers/podman-desktop/tree/main/website',
+          editUrl: 'https://github.com/podman-desktop/podman-desktop/tree/main/website',
         },
         blog: {
           blogTitle: 'Podman Desktop blog!',
@@ -411,7 +415,7 @@ const config = {
           { to: '/blog', label: 'Blog', position: 'left' },
           { to: '/tutorial', label: 'Tutorials', position: 'left' },
           {
-            href: 'https://github.com/containers/podman-desktop',
+            href: 'https://github.com/podman-desktop/podman-desktop',
             className: 'header-github-link',
             position: 'right',
           },
@@ -445,7 +449,7 @@ const config = {
             items: [
               {
                 label: 'GitHub',
-                href: 'https://github.com/containers/podman-desktop',
+                href: 'https://github.com/podman-desktop/podman-desktop',
               },
               {
                 label: 'Chat (bridged): #podman-desktop on Discord',
@@ -453,7 +457,7 @@ const config = {
               },
               {
                 label: 'Other ways to Communicate',
-                href: 'https://github.com/containers/podman-desktop#communication',
+                href: 'https://github.com/podman-desktop/podman-desktop#communication',
               },
               {
                 label: 'Current Sprint',

@@ -1000,6 +1000,10 @@ export class ColorRegistry {
       dark: colorPalette.white,
       light: colorPalette.black,
     });
+    this.registerColor(`${button}close-hover-bg`, {
+      dark: colorPalette.white + '2',
+      light: colorPalette.black + '2',
+    });
     this.registerColor(`${button}link-text`, {
       dark: colorPalette.purple[400],
       light: colorPalette.purple[700],
@@ -1300,6 +1304,7 @@ export class ColorRegistry {
 
   protected initStates(): void {
     const state = 'state-';
+    const severity = 'severity-';
 
     // general error and warning states
     this.registerColor(`${state}success`, {
@@ -1317,6 +1322,17 @@ export class ColorRegistry {
     this.registerColor(`${state}info`, {
       dark: colorPalette.purple[500],
       light: colorPalette.purple[600],
+    });
+
+    // additional severity levels
+    this.registerColor(`${severity}low`, {
+      dark: colorPalette.gray[500],
+      light: colorPalette.gray[500],
+    });
+
+    this.registerColor(`${severity}medium`, {
+      dark: colorPalette.gray[800],
+      light: colorPalette.gray[800],
     });
   }
 

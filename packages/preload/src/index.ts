@@ -56,7 +56,7 @@ import type {
 import type { ContainerInspectInfo } from '/@api/container-inspect-info';
 import type { ContainerStatsInfo } from '/@api/container-stats-info';
 import type { ContributionInfo } from '/@api/contribution-info';
-import type { DockerContextInfo, DockerSocketMappingStatusInfo } from '/@api/docker-compatibility-info';
+import type { DockerSocketMappingStatusInfo } from '/@api/docker-compatibility-info';
 import type { ExtensionInfo } from '/@api/extension-info';
 import type { FeedbackProperties, GitHubIssue } from '/@api/feedback';
 import type { HistoryInfo } from '/@api/history-info';
@@ -67,6 +67,8 @@ import type { ImageInfo } from '/@api/image-info';
 import type { ImageInspectInfo } from '/@api/image-inspect-info';
 import type { ImageSearchOptions, ImageSearchResult, ImageTagsListOptions } from '/@api/image-registry';
 import type { KubeContext } from '/@api/kubernetes-context';
+import type { ContextHealth } from '/@api/kubernetes-contexts-healths';
+import type { ContextPermission } from '/@api/kubernetes-contexts-permissions';
 import type { ContextGeneralState, ResourceName } from '/@api/kubernetes-contexts-states';
 import type { ForwardConfig, ForwardOptions } from '/@api/kubernetes-port-forward-model';
 import type { ManifestCreateOptions, ManifestInspectInfo, ManifestPushOptions } from '/@api/manifest-info';
@@ -1204,7 +1206,7 @@ export function initExposure(): void {
     async (
       containerBuildContextDirectory: string,
       relativeContainerfilePath: string,
-      imageName: string,
+      imageName: string | undefined,
       platform: string,
       selectedProvider: ProviderContainerConnectionInfo,
       key: symbol,
@@ -1871,6 +1873,14 @@ export function initExposure(): void {
     },
   );
 
+  contextBridge.exposeInMainWorld('kubernetesGetContextsHealths', async (): Promise<ContextHealth[]> => {
+    return ipcInvoke('kubernetes:getContextsHealths');
+  });
+
+  contextBridge.exposeInMainWorld('kubernetesGetContextsPermissions', async (): Promise<ContextPermission[]> => {
+    return ipcInvoke('kubernetes:getContextsPermissions');
+  });
+
   contextBridge.exposeInMainWorld('kubernetesGetClusters', async (): Promise<Cluster[]> => {
     return ipcInvoke('kubernetes-client:getClusters');
   });
@@ -1970,20 +1980,8 @@ export function initExposure(): void {
     return ipcInvoke('kubernetes-client:listPods');
   });
 
-  contextBridge.exposeInMainWorld('kubernetesListDeployments', async (): Promise<V1Deployment[]> => {
-    return ipcInvoke('kubernetes-client:listDeployments');
-  });
-
-  contextBridge.exposeInMainWorld('kubernetesListIngresses', async (): Promise<V1Ingress[]> => {
-    return ipcInvoke('kubernetes-client:listIngresses');
-  });
-
   contextBridge.exposeInMainWorld('kubernetesListRoutes', async (): Promise<V1Route[]> => {
     return ipcInvoke('kubernetes-client:listRoutes');
-  });
-
-  contextBridge.exposeInMainWorld('kubernetesListServices', async (): Promise<V1Service[]> => {
-    return ipcInvoke('kubernetes-client:listServices');
   });
 
   let onDataCallbacksKubernetesPodLogId = 0;
@@ -2150,8 +2148,8 @@ export function initExposure(): void {
     return ipcInvoke('container-provider-registry:pruneVolumes', engine);
   });
 
-  contextBridge.exposeInMainWorld('pruneImages', async (engine: string): Promise<string> => {
-    return ipcInvoke('container-provider-registry:pruneImages', engine);
+  contextBridge.exposeInMainWorld('pruneImages', async (engine: string, all = true): Promise<string> => {
+    return ipcInvoke('container-provider-registry:pruneImages', engine, all);
   });
 
   contextBridge.exposeInMainWorld('getOsPlatform', async (): Promise<string> => {
@@ -2376,14 +2374,6 @@ export function initExposure(): void {
       return ipcInvoke('docker-compatibility:getSystemDockerSocketMappingStatus');
     },
   );
-
-  contextBridge.exposeInMainWorld('getDockerContexts', async (): Promise<DockerContextInfo[]> => {
-    return ipcInvoke('docker-compatibility:listDockerContexts');
-  });
-
-  contextBridge.exposeInMainWorld('switchDockerContext', async (contextName: string): Promise<DockerContextInfo[]> => {
-    return ipcInvoke('docker-compatibility:switchDockerContext', contextName);
-  });
 
   contextBridge.exposeInMainWorld('pathRelative', async (from: string, to: string): Promise<string> => {
     return ipcInvoke('path:relative', from, to);

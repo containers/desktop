@@ -21,11 +21,12 @@ import * as path from 'node:path';
 
 import type * as containerDesktopAPI from '@podman-desktop/api';
 
+import { CONFIGURATION_DEFAULT_SCOPE } from '/@api/configuration/constants.js';
+import type { IExperimentalConfiguration } from '/@api/configuration/models.js';
 import type { NotificationCardOptions } from '/@api/notification.js';
 
 import type { ApiSenderType } from './api.js';
 import { ConfigurationImpl } from './configuration-impl.js';
-import { CONFIGURATION_DEFAULT_SCOPE } from './configuration-registry-constants.js';
 import type { Directories } from './directories.js';
 import type { Event } from './events/emitter.js';
 import { Emitter } from './events/emitter.js';
@@ -73,6 +74,7 @@ export interface IConfigurationPropertySchema {
   hidden?: boolean;
   enum?: string[];
   when?: string;
+  experimental?: IExperimentalConfiguration;
 }
 
 export type ConfigurationScope =

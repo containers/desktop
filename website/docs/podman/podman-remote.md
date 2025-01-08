@@ -56,7 +56,7 @@ $ systemctl start podman.socket
 Confirm that the socket is enabled by checking the status:
 
 ```sh
-$ systemctl status podman.socket
+$ systemctl status --user podman.socket
 ```
 
 4. Add the connection to `podman system connection ls`:
@@ -117,4 +117,4 @@ $ podman ps
 
 #### Additional resources
 
-- https://github.com/containers/podman/blob/main/docs/tutorials/remote_client.md
+- [podman:docs/tutorials/remote_client.md](https://github.com/containers/podman/blob/main/docs/tutorials/remote_client.md)

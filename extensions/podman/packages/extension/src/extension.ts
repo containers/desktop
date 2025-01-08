@@ -50,8 +50,6 @@ import {
   getAssetsFolder,
   getProviderByLabel,
   getProviderLabel,
-  isLinux,
-  isMac,
   LoggerDelegator,
   VMTYPE,
 } from './util';
@@ -71,8 +69,8 @@ let autoMachineStarted = false;
 let autoMachineName: string | undefined;
 
 // System default notifier
-let defaultMachineNotify = !isLinux();
-let defaultConnectionNotify = !isLinux();
+let defaultMachineNotify = !extensionApi.env.isLinux;
+let defaultConnectionNotify = !extensionApi.env.isLinux;
 let defaultMachineMonitor = true;
 
 // current status of machines
@@ -86,6 +84,8 @@ const containerProviderConnections = new Map<string, extensionApi.ContainerProvi
 // by default we assume it is until proven otherwise when we check
 let isDisguisedPodmanSocket = true;
 let disguisedPodmanSocketWatcher: extensionApi.FileSystemWatcher | undefined;
+
+let autostartInProgress = false;
 
 // Configuration buttons
 const configurationCompatibilityMode = 'setting.dockerCompatibility';
@@ -200,7 +200,7 @@ export async function updateMachines(
 
     // Only on macOS and Windows should we show the setup notification
     // if for some reason doing getJSONMachineList fails..
-    if (shouldNotifySetup && !isLinux()) {
+    if (shouldNotifySetup && !extensionApi.env.isLinux) {
       // push setup notification
       notifySetupPodman();
       shouldNotifySetup = false;
@@ -222,7 +222,7 @@ export async function updateMachines(
   }
 
   // invalid machines is not making the provider working properly so always notify
-  if (shouldCleanMachine && shouldNotifySetup && !isLinux()) {
+  if (shouldCleanMachine && shouldNotifySetup && !extensionApi.env.isLinux) {
     // push setup notification
     notifySetupPodman();
     shouldNotifySetup = false;
@@ -232,7 +232,7 @@ export async function updateMachines(
 
   // Only show the notification on macOS and Windows
   // as Podman is already installed on Linux and machine is OPTIONAL.
-  if (shouldNotifySetup && machines.length === 0 && !isLinux()) {
+  if (shouldNotifySetup && machines.length === 0 && !extensionApi.env.isLinux) {
     // push setup notification
     notifySetupPodman();
     shouldNotifySetup = false;
@@ -241,7 +241,7 @@ export async function updateMachines(
   // if there is at least one machine whihc does not need to be cleaned and the OS is not Linux
   // podman is correctly setup so if there is an old notification asking the user to take action
   // we dispose it as not needed anymore
-  if (!shouldCleanMachine && machines.length > 0 && !isLinux()) {
+  if (!shouldCleanMachine && machines.length > 0 && !extensionApi.env.isLinux) {
     notificationDisposable?.dispose();
     shouldNotifySetup = true;
   }
@@ -346,9 +346,9 @@ export async function updateMachines(
         console.debug('Podman extension:', 'Failed to read socketPath from machine inspect');
       }
       if (!socketPath) {
-        if (isMac()) {
+        if (extensionApi.env.isMac) {
           socketPath = calcMacosSocketPath(machineName);
-        } else if (isLinux()) {
+        } else if (extensionApi.env.isLinux) {
           socketPath = calcLinuxSocketPath(machineName);
         } else if (extensionApi.env.isWindows) {
           socketPath = calcWinPipeName(machineName);
@@ -374,7 +374,7 @@ export async function updateMachines(
   // we will update the provider as being 'installed', or ready / starting / configured if there is a machine
   // if we are on Linux, ignore this as podman machine is OPTIONAL and the provider status in Linux is based upon
   // the native podman installation / not machine.
-  if (!isLinux()) {
+  if (!extensionApi.env.isLinux) {
     if (machines.length === 0) {
       if (provider.status !== 'configuring') {
         provider.updateStatus('installed');
@@ -669,16 +669,19 @@ async function timeout(time: number): Promise<void> {
   });
 }
 
-async function monitorMachines(
+export async function monitorMachines(
   provider: extensionApi.Provider,
   podmanConfiguration: PodmanConfiguration,
 ): Promise<void> {
   // call us again
   if (!stopLoop) {
-    try {
-      await updateMachines(provider, podmanConfiguration);
-    } catch (error) {
-      // ignore the update of machines
+    // skip the update during the auto start process
+    if (!autostartInProgress) {
+      try {
+        await updateMachines(provider, podmanConfiguration);
+      } catch (error) {
+        // ignore the update of machines
+      }
     }
     await timeout(5000);
     monitorMachines(provider, podmanConfiguration).catch((error: unknown) => {
@@ -715,7 +718,7 @@ async function monitorProvider(provider: extensionApi.Provider): Promise<void> {
         // if podman is not installed and the OS is linux we show the podman onboarding notification (if it has not been shown earlier)
         // this should be limited to Linux as in other OSes the onboarding workflow is enabled based on the podman machine existance
         // and the notification is handled by checking the machine
-        if (isLinux() && shouldNotifySetup) {
+        if (extensionApi.env.isLinux && shouldNotifySetup) {
           // push setup notification
           notifySetupPodman();
           shouldNotifySetup = false;
@@ -729,7 +732,7 @@ async function monitorProvider(provider: extensionApi.Provider): Promise<void> {
 
         extensionApi.context.setValue('podmanIsNotInstalled', false, 'onboarding');
         // if podman has been installed, we reset the notification flag so if podman is uninstalled in future we can show the notification again
-        if (isLinux()) {
+        if (extensionApi.env.isLinux) {
           shouldNotifySetup = true;
           // notification is no more required
           notificationDisposable?.dispose();
@@ -778,7 +781,7 @@ export async function registerProviderFor(
     },
   };
   //support edit only on MacOS as Podman WSL is nop and generates errors
-  if (isMac()) {
+  if (extensionApi.env.isMac) {
     lifecycle.edit = async (context, params, logger, _token): Promise<void> => {
       let effective = false;
       const args = ['machine', 'set', machineInfo.name];
@@ -853,7 +856,7 @@ export async function registerProviderFor(
 
 export async function checkRosettaMacArm(podmanConfiguration: PodmanConfiguration): Promise<void> {
   // check that rosetta is there for macOS / arm as the machine may fail to start
-  if (isMac() && os.arch() === 'arm64') {
+  if (extensionApi.env.isMac && os.arch() === 'arm64') {
     const isEnabled = await podmanConfiguration.isRosettaEnabled();
     if (isEnabled) {
       // call the command `arch -arch x86_64 uname -m` to check if rosetta is enabled
@@ -1177,7 +1180,7 @@ export function registerOnboardingRemoveUnsupportedMachinesCommand(): extensionA
     let machineFolderToCheck: string | undefined;
     // check invalid config files only with v5
     if (installedPodman?.version.startsWith('5.')) {
-      if (isMac()) {
+      if (extensionApi.env.isMac) {
         machineFolderToCheck = path.resolve(os.homedir(), appConfigDir(), 'machine', 'applehv');
       } else if (extensionApi.env.isWindows) {
         machineFolderToCheck = path.resolve(os.homedir(), appConfigDir(), 'machine', 'wsl');
@@ -1453,44 +1456,54 @@ export async function activate(extensionContext: extensionApi.ExtensionContext):
     extensionContext.subscriptions.push(command);
   }
 
+  const doAutoStart = async (logger: extensionApi.Logger): Promise<void> => {
+    autostartInProgress = true;
+    // If autostart has been enabled for the machine, try to start it.
+    try {
+      await updateMachines(provider, podmanConfiguration);
+    } catch (error) {
+      // ignore the update of machines
+    }
+
+    // do we have a running machine ?
+    const isRunningMachine = Array.from(podmanMachinesStatuses.values()).find(
+      connectionStatus => connectionStatus === 'started' || connectionStatus === 'starting',
+    );
+    if (isRunningMachine) {
+      console.log('Podman extension:', 'Do not start a machine as there is already one starting or started');
+      return;
+    }
+
+    // start the first machine if any
+    const machines = Array.from(podmanMachinesStatuses.entries());
+    if (machines.length > 0) {
+      const [machineName] = machines[0];
+      if (!podmanMachinesInfo.has(machineName)) {
+        console.error('Unable to retrieve machine infos to be autostarted', machineName);
+      } else {
+        console.log('Podman extension:', 'Autostarting machine', machineName);
+        const machineInfo = podmanMachinesInfo.get(machineName);
+        const containerProviderConnection = containerProviderConnections.get(machineName);
+        if (containerProviderConnection && machineInfo) {
+          const context: extensionApi.LifecycleContext = extensionApi.provider.getProviderLifecycleContext(
+            provider.id,
+            containerProviderConnection,
+          );
+          await startMachine(provider, podmanConfiguration, machineInfo, context, logger, undefined, true);
+          autoMachineStarted = true;
+          autoMachineName = machineName;
+        }
+      }
+    }
+  };
+
   provider.registerAutostart({
     start: async (logger: extensionApi.Logger) => {
-      // If autostart has been enabled for the machine, try to start it.
       try {
-        await updateMachines(provider, podmanConfiguration);
-      } catch (error) {
-        // ignore the update of machines
-      }
-
-      // do we have a running machine ?
-      const isRunningMachine = Array.from(podmanMachinesStatuses.values()).find(
-        connectionStatus => connectionStatus === 'started' || connectionStatus === 'starting',
-      );
-      if (isRunningMachine) {
-        console.log('Podman extension:', 'Do not start a machine as there is already one starting or started');
-        return;
-      }
-
-      // start the first machine if any
-      const machines = Array.from(podmanMachinesStatuses.entries());
-      if (machines.length > 0) {
-        const [machineName] = machines[0];
-        if (!podmanMachinesInfo.has(machineName)) {
-          console.error('Unable to retrieve machine infos to be autostarted', machineName);
-        } else {
-          console.log('Podman extension:', 'Autostarting machine', machineName);
-          const machineInfo = podmanMachinesInfo.get(machineName);
-          const containerProviderConnection = containerProviderConnections.get(machineName);
-          if (containerProviderConnection && machineInfo) {
-            const context: extensionApi.LifecycleContext = extensionApi.provider.getProviderLifecycleContext(
-              provider.id,
-              containerProviderConnection,
-            );
-            await startMachine(provider, podmanConfiguration, machineInfo, context, logger, undefined, true);
-            autoMachineStarted = true;
-            autoMachineName = machineName;
-          }
-        }
+        autostartInProgress = true;
+        await doAutoStart(logger);
+      } finally {
+        autostartInProgress = false;
       }
     },
   });
@@ -1521,7 +1534,7 @@ export async function start(
     updateWSLHyperVEnabledContextValue(isWslAndHyperEnabled);
   }
 
-  if (isMac()) {
+  if (extensionApi.env.isMac) {
     provider.registerCleanup(new PodmanCleanupMacOS());
   } else if (extensionApi.env.isWindows) {
     provider.registerCleanup(new PodmanCleanupWindows());
@@ -1545,7 +1558,7 @@ export async function start(
   // NOT packaged with qemu + kvm by default. So, we don't want to
   // create machines on Linux via Podman Desktop, however we will still support
   // the lifecycle management of one.
-  if (isMac() || extensionApi.env.isWindows) {
+  if (extensionApi.env.isMac || extensionApi.env.isWindows) {
     provider.setContainerProviderConnectionFactory(
       {
         initialize: () => createMachine({}),
@@ -1564,7 +1577,7 @@ export async function start(
   // Below is Linux specific code:
   // * Monitors the system service for an unlimited time
   // * Uses the native system socket
-  if (isLinux()) {
+  if (extensionApi.env.isLinux) {
     // on Linux, need to run the system service for unlimited time
     let command = 'podman';
     let args = ['system', 'service', '--time=0'];
@@ -1888,7 +1901,9 @@ export function isRootfulMachineInitSupported(podmanVersion: string): boolean {
 const PODMAN_MINIMUM_VERSION_FOR_NEW_SOCKET_LOCATION = '4.5.0';
 
 export function isPodmanSocketLocationMoved(podmanVersion: string): boolean {
-  return isLinux() && compareVersions(podmanVersion, PODMAN_MINIMUM_VERSION_FOR_NEW_SOCKET_LOCATION) >= 0;
+  return (
+    extensionApi.env.isLinux && compareVersions(podmanVersion, PODMAN_MINIMUM_VERSION_FOR_NEW_SOCKET_LOCATION) >= 0
+  );
 }
 
 const PODMAN_MINIMUM_VERSION_FOR_USER_MODE_NETWORKING = '4.6.0';
@@ -1904,7 +1919,7 @@ const PODMAN_MINIMUM_VERSION_FOR_LIBKRUN_SUPPORT = '5.2.0-rc1';
 
 // Checks if libkrun is supported. Only Mac platform allows this parameter to be tuned
 export function isLibkrunSupported(podmanVersion: string): boolean {
-  return isMac() && compareVersions(podmanVersion, PODMAN_MINIMUM_VERSION_FOR_LIBKRUN_SUPPORT) >= 0;
+  return extensionApi.env.isMac && compareVersions(podmanVersion, PODMAN_MINIMUM_VERSION_FOR_LIBKRUN_SUPPORT) >= 0;
 }
 
 // Set wslEnabled. Used for testing purposes
@@ -2039,7 +2054,7 @@ export async function createMachine(
     if (extensionApi.env.isWindows) {
       provider = wslEnabled ? 'wsl' : 'hyperv';
       telemetryRecords.provider = provider;
-    } else if (isMac()) {
+    } else if (extensionApi.env.isMac) {
       provider = 'applehv';
       telemetryRecords.provider = provider;
     }
@@ -2090,16 +2105,9 @@ export async function createMachine(
       parameters.push(`docker://${imageUri}`);
       telemetryRecords.imagePath = 'custom-registry';
     }
-  } else if (isMac() || extensionApi.env.isWindows) {
+  } else if (extensionApi.env.isMac || (extensionApi.env.isWindows && provider === 'wsl')) {
     // check if we have an embedded asset for the image path for macOS or Windows
-    let suffix = '';
-    if (extensionApi.env.isWindows) {
-      suffix = `-${process.arch}.tar.zst`;
-    } else if (isMac()) {
-      suffix = `-${process.arch}.zst`;
-    }
-
-    const assetImagePath = path.resolve(getAssetsFolder(), `podman-image${suffix}`);
+    const assetImagePath = path.resolve(getAssetsFolder(), `podman-image-${process.arch}.zst`);
 
     const podmanInstallation = await getPodmanInstallation();
 
@@ -2210,7 +2218,7 @@ function setupDisguisedPodmanSocketWatcher(
   });
 
   let socketWatcher: extensionApi.FileSystemWatcher | undefined = undefined;
-  if (isLinux() || isMac()) {
+  if (extensionApi.env.isLinux || extensionApi.env.isMac) {
     socketWatcher = extensionApi.fs.createFileSystemWatcher(socketFile);
   }
 
@@ -2253,7 +2261,7 @@ export async function checkDisguisedPodmanSocket(provider: extensionApi.Provider
 
   // NOTE: LINUX SUPPORT
   // Linux does not support compatibility mode button, so do not sending the warning
-  if (!isLinux()) {
+  if (!extensionApi.env.isLinux) {
     const retrievedWarnings = isDisguisedPodmanSocket ? [] : [getDisguisedPodmanInformation()];
     provider.updateWarnings(retrievedWarnings);
   }

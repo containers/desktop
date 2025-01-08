@@ -49,6 +49,9 @@ beforeEach(() => {
     addListener: vi.fn(),
     removeListener: vi.fn(),
   });
+
+  // reset terminals
+  containerTerminals.set([]);
 });
 
 test('expect being able to reconnect ', async () => {
@@ -247,5 +250,5 @@ test('terminal active/ restarts connection after restarting a container', async 
 
   await tick();
 
-  expect(shellInContainerMock).toHaveBeenCalledTimes(6);
+  expect(shellInContainerMock).toHaveBeenCalledTimes(2);
 });

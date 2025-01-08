@@ -46,7 +46,7 @@ spec:
 
 #### Procedure: Creating an object
 
-1. Go to the **Kubernetes** component page. 
+1. Go to the **Kubernetes** component page.
 2. Click one of the options to open the object page.
 
    ![kube objects](img/kube-objects.png)
@@ -67,8 +67,9 @@ spec:
 #### Verification
 
 1. View the created object:
-    - View the `Pod` object on the **Pods** component page.
-    - View the other Kubernetes objects on the related object page. For example, if you have created a `Node` object, you can view it on the **Kubernetes > Nodes** page.  
+
+   - View the `Pod` object on the **Pods** component page.
+   - View the other Kubernetes objects on the related object page. For example, if you have created a `Node` object, you can view it on the **Kubernetes > Nodes** page.
 
 2. Optional: Click the name of the object to view its detailed summary.
    ![summary tab](img/summary-tab.png)

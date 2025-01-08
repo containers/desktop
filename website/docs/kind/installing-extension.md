@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-title: Installing the Kind extension 
+title: Installing the Kind extension
 description: Tutorial on how to install the Kind extension and use it
 keywords: [podman desktop, podman, kind, kubernetes]
 tags: [podman, kubernetes, kind]
@@ -12,11 +12,11 @@ import ReactPlayer from 'react-player'
 
 :::note
 
-Kind is a *built-in* extension to Podman Desktop and no installation is necessary.
+Kind is a _built-in_ extension to Podman Desktop and no installation is necessary.
 
 :::
 
-The Kind extension provides the capability of creating a local Kubernetes cluster using only containers rather than a Virtual Machine. 
+The Kind extension provides the capability of creating a local Kubernetes cluster using only containers rather than a Virtual Machine.
 
 #### Procedure
 

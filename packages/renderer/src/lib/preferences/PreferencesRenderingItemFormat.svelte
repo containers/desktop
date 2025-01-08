@@ -14,25 +14,41 @@ import type { IConfigurationPropertyRecordedSchema } from '../../../../main/src/
 import Markdown from '../markdown/Markdown.svelte';
 import { getInitialValue, getNormalizedDefaultNumberValue } from './Util';
 
-let invalidText: string | undefined = undefined;
-export let invalidRecord = (_error: string) => {};
-export let validRecord = () => {};
-export let updateResetButtonVisibility = (_recordValue: any) => {};
-export let resetToDefault = false;
-export let enableAutoSave = false;
+interface Props {
+  record: IConfigurationPropertyRecordedSchema;
+  initialValue: Promise<any>;
+  givenValue?: unknown;
+  setRecordValue?: (id: string, value: string | boolean | number) => void;
+  invalidRecord?: (error: string) => void;
+  validRecord?: () => void;
+  updateResetButtonVisibility?: (recordValue: any) => void;
+  resetToDefault?: boolean;
+  enableAutoSave?: boolean;
+  enableSlider?: boolean;
+}
 
-export let setRecordValue = (_id: string, _value: string | boolean | number) => {};
-export let enableSlider = false;
-export let record: IConfigurationPropertyRecordedSchema;
-export let initialValue: Promise<any>;
-export let givenValue: unknown = undefined;
+let {
+  record,
+  initialValue,
+  givenValue,
+  setRecordValue = () => {},
+  invalidRecord = () => {},
+  validRecord = () => {},
+  updateResetButtonVisibility = () => {},
+  resetToDefault = false,
+  enableAutoSave = false,
+  enableSlider = false,
+}: Props = $props();
 
 let currentRecord: IConfigurationPropertyRecordedSchema;
 let recordUpdateTimeout: NodeJS.Timeout;
 
-let recordValue: string | boolean | number | undefined;
-$: recordValue;
-$: updateResetButtonVisibility?.(recordValue);
+let invalidText: string | undefined = $state(undefined);
+let recordValue: string | boolean | number | undefined = $state(undefined);
+
+$effect(() => {
+  updateResetButtonVisibility?.(recordValue);
+});
 
 let callBack: EventListenerOrEventListenerObject | undefined = undefined;
 let callbackId: string | undefined = undefined;
@@ -58,28 +74,32 @@ onDestroy(() => {
   }
 });
 
-$: if (resetToDefault) {
-  recordValue = record.type === 'number' ? getNormalizedDefaultNumberValue(record) : record.default;
-  if (ensureType(recordValue)) {
-    update(record).catch((err: unknown) => console.log(`Error updating ${record.id}`, err));
+$effect(() => {
+  if (resetToDefault) {
+    recordValue = record.type === 'number' ? getNormalizedDefaultNumberValue(record) : record.default;
+    if (ensureType(recordValue)) {
+      update(record).catch((err: unknown) => console.log(`Error updating ${record.id}`, err));
+    }
+
+    resetToDefault = false;
   }
+});
 
-  resetToDefault = false;
-}
+$effect(() => {
+  if (!isEqual(currentRecord, record)) {
+    initialValue
+      .then(value => {
+        recordValue = value;
+        if (record.type === 'boolean') {
+          recordValue = !!value;
+        }
+      })
+      .catch((err: unknown) => console.error('Error getting initial value', err));
 
-$: if (!isEqual(currentRecord, record)) {
-  initialValue
-    .then(value => {
-      recordValue = value;
-      if (record.type === 'boolean') {
-        recordValue = !!value;
-      }
-    })
-    .catch((err: unknown) => console.error('Error getting initial value', err));
-
-  invalidText = undefined;
-  currentRecord = record;
-}
+    invalidText = undefined;
+    currentRecord = record;
+  }
+});
 
 async function update(record: IConfigurationPropertyRecordedSchema) {
   // save the value
@@ -147,6 +167,15 @@ async function onChange(recordId: string, value: boolean | string | number): Pro
   // auto save
   return await autoSave();
 }
+
+function numberItemValue(): number {
+  if (givenValue && typeof givenValue === 'number') {
+    return givenValue;
+  } else if (recordValue && typeof recordValue === 'number') {
+    return recordValue;
+  }
+  return getNormalizedDefaultNumberValue(record);
+}
 </script>
 
 <div class="flex flex-row mb-1 pt-2 text-start items-center justify-start">
@@ -167,7 +196,7 @@ async function onChange(recordId: string, value: boolean | string | number): Pro
     {:else}
       <NumberItem
         record={record}
-        value={typeof recordValue === 'number' ? recordValue : getNormalizedDefaultNumberValue(record)}
+        value={numberItemValue()}
         onChange={onChange}
         invalidRecord={invalidRecord} />
     {/if}

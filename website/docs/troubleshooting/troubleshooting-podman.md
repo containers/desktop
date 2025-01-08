@@ -234,12 +234,11 @@ This might appear when either:
 
 _Note:_ If Docker Desktop is started again, it will automatically re-alias the default Docker socket location and the Podman compatibility warning will re-appear.
 
-## Uninstalling Podman Desktop preserves the old configuration data  
+## Uninstalling Podman Desktop preserves the old configuration data
 
 #### Issue
 
 After uninstalling Podman Desktop, the configuration data persists even though it is not needed for a fresh installation.
-
 
 #### Solution
 
@@ -248,11 +247,26 @@ After uninstalling Podman Desktop, the configuration data persists even though i
 1. Go to the `$HOME/.local/share/containers` directory, where `$HOME` denotes the home folder of the current user.
 1. Delete the `podman-desktop` folder.
 
-**_Deleting Podman configuration_** 
+**_Deleting Podman configuration_**
 
-Podman stores its configuration files in the `$HOME/.config/containers` directory. Options available to delete Podman configuration: 
+Podman stores its configuration files in the `$HOME/.config/containers` directory. Options available to delete Podman configuration:
+
 - Using CLI
-   - Run the `podman machine reset` command.
+  - Run the `podman machine reset` command.
 - Using UI
-   1. Click the **Troubleshooting** icon in the status bar.
-   1. Click the **Cleanup/Purge data** button to delete all resources from the engine.
+  1.  Click the **Troubleshooting** icon in the status bar.
+  1.  Click the **Cleanup/Purge data** button to delete all resources from the engine.
+
+## Kubernetes clusters are not reachable from Podman Desktop
+
+#### Issue
+
+When you connect to a Kubernetes cluster, such as Amazon Web Services (AWS) or Oracle Cloud Infrastructure (OCI), you might get this error: `spawnSync <cloud-provider-binary> ENOENT`.
+
+Kubernetes clusters from cloud providers require an executable installed on the user's machine for authentication tokens. When you add the path of this executable to the `PATH` for the shell session, this change does not apply to Podman Desktop. This prevents Podman Desktop from obtaining new tokens, making clusters inaccessible.
+
+#### Solution
+
+1. Move the binary located in your `.kube/config` file to a system bin directory, such as `/usr/local/bin/`.
+
+1. Set the value of the `command` parameter to the full path of the executable in your Kubernetes configuration file. For example, `command: /usr/local/bin/<cloud-provider-binary>`, where `cloud-provider-binary` denotes the binary name, such as `aws` or `oci`.

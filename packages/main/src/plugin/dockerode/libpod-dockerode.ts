@@ -140,6 +140,12 @@ export interface ContainerCreateNamedVolume {
   SubPath?: string;
 }
 
+// represents a device request through the libPod API
+// only path is currently translated
+export interface PodmanDevice {
+  path: string;
+}
+
 export interface ContainerCreateOptions {
   command?: string[];
   entrypoint?: string | string[];
@@ -169,6 +175,8 @@ export interface ContainerCreateOptions {
   hostadd?: Array<string>;
   userns?: string;
   volumes?: Array<ContainerCreateNamedVolume>;
+  selinux_opts?: string[];
+  devices?: PodmanDevice[];
 }
 
 export interface PodRemoveOptions {
@@ -522,11 +530,9 @@ export class LibpodDockerode {
     };
 
     // add pruneAllImages
-    prototypeOfDockerode.pruneAllImages = function (): Promise<unknown> {
+    prototypeOfDockerode.pruneAllImages = function (all: boolean): Promise<unknown> {
       const optsf = {
-        path: '/v4.2.0/libpod/images/prune?all=true&', // this works
-        // For some reason the below doesn't work
-        // options: {all: 'true'}, // this doesn't work
+        path: '/v4.2.0/libpod/images/prune',
         method: 'POST',
         statusCodes: {
           200: true,
@@ -534,6 +540,12 @@ export class LibpodDockerode {
           500: 'server error',
         },
       };
+      if (all) {
+        optsf.path += '?all=true&';
+        // For some reason the below doesn't work
+        // options: {all: 'true'}, // this doesn't work
+      }
+
       return new Promise((resolve, reject) => {
         this.modem.dial(optsf, (err: unknown, data: unknown) => {
           if (err) {

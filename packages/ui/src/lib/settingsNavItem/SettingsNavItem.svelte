@@ -1,15 +1,31 @@
 <script lang="ts">
 import type { IconDefinition } from '@fortawesome/free-regular-svg-icons';
+import type { Component } from 'svelte';
 import Fa from 'svelte-fa';
 
-export let title: string;
-export let href: string;
-export let section = false;
-export let expanded = false;
-export let child = false;
-export let selected: boolean = false;
-export let icon: IconDefinition | undefined = undefined;
-export let onClick: () => void = () => {};
+import { isFontAwesomeIcon } from '../utils/icon-utils';
+
+interface Props {
+  title: string;
+  href: string;
+  section?: boolean;
+  expanded?: boolean;
+  child?: boolean;
+  selected?: boolean;
+  icon?: IconDefinition | Component;
+  onClick?: () => void;
+}
+
+let {
+  title,
+  href,
+  section = false,
+  expanded = $bindable(),
+  child = false,
+  selected = false,
+  icon = undefined,
+  onClick = (): void => {},
+}: Props = $props();
 
 function rotate(
   node: unknown,
@@ -35,7 +51,7 @@ function click(): void {
 }
 </script>
 
-<a class="no-underline" href={href} aria-label={title} on:click={click}>
+<a class="no-underline" href={href} aria-label={title} onclick={click}>
   <div
     class="flex w-full pr-1 py-2 justify-between items-center cursor-pointer border-l-[4px]"
     class:pl-3={!child}
@@ -53,7 +69,14 @@ function click(): void {
     class:hover:border-[var(--pd-secondary-nav-text-hover-bg)]={!selected}>
     <span class="group-hover:block flex flex-row items-center" class:capitalize={!child}>
       {#if icon}
-        <Fa class="mr-4" icon={icon} />
+        {#if isFontAwesomeIcon(icon)}
+          <Fa class="mr-4" {icon} />
+        {:else}
+          {@const Icon = icon}
+          <div class="mr-4">
+            <Icon size="14" />
+          </div>
+        {/if}
       {/if}
       {title}
     </span>

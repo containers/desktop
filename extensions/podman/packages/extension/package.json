@@ -2,7 +2,7 @@
   "name": "podman",
   "displayName": "Podman",
   "description": "Integration for Podman and Podman Machines",
-  "version": "1.15.0-next",
+  "version": "1.16.0-next",
   "icon": "icon.png",
   "type": "module",
   "publisher": "podman-desktop",
@@ -398,16 +398,16 @@
     "ssh2": "^1.16.0"
   },
   "devDependencies": {
-    "@types/ssh2": "^1.15.1",
+    "@types/ssh2": "^1.15.3",
     "@types/sshpk": "^1.17.4",
     "adm-zip": "^0.5.16",
     "hasha": "^6.0.0",
     "mkdirp": "^3.0.1",
-    "msw": "^2.6.6",
-    "octokit": "^4.0.2",
+    "msw": "^2.7.0",
+    "octokit": "^4.0.3",
     "sshpk": "^1.18.0",
     "tsx": "^4.19.2",
-    "vite": "^6.0.2",
+    "vite": "^6.0.7",
     "vitest": "^2.1.6"
   }
 }
