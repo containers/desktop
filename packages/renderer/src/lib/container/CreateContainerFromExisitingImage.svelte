@@ -1,35 +1,37 @@
 <script lang="ts">
-import { faArrowCircleDown, faCog, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
-import { Button, Checkbox, Dropdown, ErrorMessage, Tooltip } from '@podman-desktop/ui-svelte';
+import { faArrowCircleDown, faCircleCheck } from '@fortawesome/free-solid-svg-icons';
+import { Button, Dropdown, ErrorMessage } from '@podman-desktop/ui-svelte';
 import type { Terminal } from '@xterm/xterm';
 import { onMount, tick } from 'svelte';
-import Fa from 'svelte-fa';
 import { router } from 'tinro';
 
+import { lastPage } from '/@/stores/breadcrumb';
+import { runImageInfo } from '/@/stores/run-image-store';
 import type { ImageSearchOptions } from '/@api/image-registry';
 import type { ProviderContainerConnectionInfo } from '/@api/provider-info';
 import type { PullEvent } from '/@api/pull-event';
 
 import { providerInfos } from '../../stores/providers';
+import { ImageUtils } from '../image/image-utils';
+import ImageIcon from '../images/ImageIcon.svelte';
 import EngineFormPage from '../ui/EngineFormPage.svelte';
 import TerminalWindow from '../ui/TerminalWindow.svelte';
 import Typeahead from '../ui/Typeahead.svelte';
 import WarningMessage from '../ui/WarningMessage.svelte';
-import RecommendedRegistry from './RecommendedRegistry.svelte';
 
 const DOCKER_PREFIX = 'docker.io';
 const DOCKER_PREFIX_WITH_SLASH = DOCKER_PREFIX + '/';
+
+const imageUtils = new ImageUtils();
 
 let logsPull: Terminal;
 let pullError = '';
 let pullInProgress = false;
 let pullFinished = false;
-let shortnameImages: string[] = [];
-let podmanFQN = '';
-let usePodmanFQN = false;
 let isValidName = true;
+let matchingLocalImages: string[] = [];
 
-export let imageToPull: string | undefined = undefined;
+let imageToPull: string = '';
 
 $: providerConnections = $providerInfos
   .map(provider => provider.containerConnections)
@@ -40,28 +42,6 @@ let selectedProviderConnection: ProviderContainerConnectionInfo | undefined;
 
 const lineNumberPerId = new Map<string, number>();
 let lineIndex = 0;
-
-async function resolveShortname(): Promise<void> {
-  if (!selectedProviderConnection || selectedProviderConnection.type !== 'podman') {
-    return;
-  }
-  if (imageToPull && !imageToPull.includes('/')) {
-    shortnameImages = (await window.resolveShortnameImage(selectedProviderConnection, imageToPull)) ?? [];
-    // not a shortname
-  } else {
-    podmanFQN = '';
-    shortnameImages = [];
-    usePodmanFQN = false;
-  }
-  // checks if there is no FQN that is from dokcer hub
-  if (!shortnameImages.find(name => name.includes('docker.io'))) {
-    podmanFQN = shortnameImages[0];
-  } else {
-    podmanFQN = '';
-    shortnameImages = [];
-    usePodmanFQN = false;
-  }
-}
 
 function callback(event: PullEvent) {
   let lineIndexToWrite;
@@ -125,29 +105,14 @@ async function pullImage() {
 
   pullInProgress = true;
   try {
-    if (podmanFQN) {
-      usePodmanFQN
-        ? await window.pullImage(selectedProviderConnection, podmanFQN.trim(), callback)
-        : await window.pullImage(selectedProviderConnection, `docker.io/${imageToPull.trim()}`, callback);
-    } else {
-      await window.pullImage(selectedProviderConnection, imageToPull.trim(), callback);
-    }
+    await window.pullImage(selectedProviderConnection, imageToPull.trim(), callback);
     pullInProgress = false;
     pullFinished = true;
-  } catch (error: unknown) {
-    const errorMessage =
-      error && typeof error === 'object' && 'message' in error && error.message ? error.message : error;
+  } catch (error: any) {
+    const errorMessage = error.message ? error.message : error;
     pullError = `Error while pulling image from ${selectedProviderConnection.name}: ${errorMessage}`;
     pullInProgress = false;
   }
-}
-
-async function pullImageFinished() {
-  router.goto('/images');
-}
-
-async function gotoManageRegistries() {
-  router.goto('/preferences/registries');
 }
 
 onMount(() => {
@@ -209,6 +174,18 @@ async function searchImages(value: string): Promise<string[]> {
   return result;
 }
 
+async function searchLocalImages(value: string): Promise<string[]> {
+  const listImages = await window.listImages();
+  const localImagesNames = listImages.map(image => {
+    if (image.RepoTags) {
+      return image.RepoTags;
+    }
+    return [];
+  });
+  matchingLocalImages = localImagesNames.flat().filter(image => image.includes(value) && image !== '');
+  return matchingLocalImages;
+}
+
 let latestTagMessage: string | undefined = undefined;
 async function searchLatestTag(): Promise<void> {
   if (imageNameIsInvalid || !imageToPull) {
@@ -245,97 +222,92 @@ function checkIfTagExist(image: string, tags: string[]): void {
 
   isValidName = tags.some(t => t === tag);
 }
+
+async function buildContainerFromImage(): Promise<void> {
+  const localImages = (await window.listImages()).filter(
+    image => (image.RepoTags?.filter(repoTag => repoTag.includes(imageToPull)) ?? []).length > 0,
+  );
+  console.log(localImages);
+  if (localImages.length > 0) {
+    const chosenImage = imageUtils.getImagesInfoUI(localImages[0], []);
+    if (chosenImage.length > 0) {
+      runImageInfo.set(chosenImage[0]);
+      router.goto('/image/run/basic');
+    }
+  }
+}
 </script>
 
-<EngineFormPage
-  title="Pull image from a registry"
-  inProgress={pullInProgress}
-  showEmptyScreen={providerConnections.length === 0}>
+<EngineFormPage title="Select an image">
   <svelte:fragment slot="icon">
-    <i class="fas fa-arrow-circle-down fa-2x" aria-hidden="true"></i>
+    <ImageIcon />
   </svelte:fragment>
+  <div slot="content" class="space-y-2 flex flex-col">
+    <Typeahead
+      id="imageName"
+      name="imageName"
+      placeholder="Select am exisiting image"
+      searchFunctions={[searchLocalImages, searchImages]}
+      headings={['Local Images', 'Registry Images']}
+      onChange={async (s: string) => {
+        validateImageName(s);
+        await searchLatestTag();
+      }}
+      disabled={pullFinished || pullInProgress}
+      error={!isValidName}
+      required
+      initialFocus />
+    {#if imageNameInvalid}
+      <ErrorMessage error={imageNameInvalid} />
+    {/if}
+    {#if latestTagMessage}
+      <WarningMessage error={latestTagMessage} />
+    {/if}
 
-  <svelte:fragment slot="actions">
-    <Button on:click={() => gotoManageRegistries()} icon={faCog}>Manage registries</Button>
-  </svelte:fragment>
-
-  <div slot="content" class="space-y-6">
-    <div class="w-full">
-      <label for="imageName" class="block mb-2 font-semibold text-[var(--pd-content-card-header-text)]"
-        >Image to Pull</label>
-      <div class="flex flex-col">
-        <Typeahead
-          id="imageName"
-          name="imageName"
-          placeholder="Image name"
-          searchFunctions={[searchImages]}
-          onChange={async (s: string) => {
-            validateImageName(s);
-            await resolveShortname();
-            await searchLatestTag();
-          }}
-          onEnter={pullImage}
-          disabled={pullFinished || pullInProgress}
-          error={!isValidName}
-          required
-          initialFocus />
-        {#if selectedProviderConnection?.type === 'podman' && podmanFQN}
-          <div class="absolute mt-2 ml-[-18px] self-start">
-            <Tooltip tip="Shortname images will be pulled from Docker Hub" topRight>
-              <Fa id="shortname-warning" size="1.1x" class="text-[var(--pd-state-warning)]" icon={faTriangleExclamation} />
-            </Tooltip>
-          </div>
-        {/if}
+    {#if providerConnections.length > 1}
+      <div class="pt-4">
+        <label for="providerChoice" class="block mb-2 font-semibold text-[var(--pd-content-card-header-text)]"
+          >Container Engine</label>
+        <Dropdown
+          id="providerChoice"
+          name="providerChoice"
+          bind:value={selectedProviderConnection}
+          options={providerConnections.map(providerConnection => ({
+            label: providerConnection.name,
+            value: providerConnection,
+          }))}>
+        </Dropdown>
       </div>
-      {#if selectedProviderConnection?.type === 'podman' && podmanFQN}
-        <Checkbox class="pt-2" bind:checked={usePodmanFQN} title="Use Podman FQN" disabled={podmanFQN === ''}
-          >Use Podman FQN for shortname image</Checkbox>
-      {/if}
-      {#if imageNameInvalid}
-        <ErrorMessage error={imageNameInvalid} />
-      {/if}
-      {#if latestTagMessage}
-        <WarningMessage error={latestTagMessage} />
-      {/if}
-
-      {#if providerConnections.length > 1}
-        <div class="pt-4">
-          <label for="providerChoice" class="block mb-2 font-semibold text-[var(--pd-content-card-header-text)]"
-            >Container Engine</label>
-          <Dropdown
-            id="providerChoice"
-            name="providerChoice"
-            bind:value={selectedProviderConnection}
-            options={providerConnections.map(providerConnection => ({
-              label: providerConnection.name,
-              value: providerConnection,
-            }))}>
-          </Dropdown>
-        </div>
-      {/if}
-      {#if providerConnections.length === 1}
-        <input type="hidden" name="providerChoice" readonly bind:value={selectedProviderConnection} />
-      {/if}
-    </div>
+    {/if}
+    {#if providerConnections.length === 1}
+      <input type="hidden" name="providerChoice" readonly bind:value={selectedProviderConnection} />
+    {/if}
+  
     <footer>
-      <div class="w-full flex flex-col justify-end">
-        {#if !pullFinished}
-          <Button
-            icon={faArrowCircleDown}
-            bind:disabled={imageNameIsInvalid}
-            on:click={() => pullImage()}
-            bind:inProgress={pullInProgress}>
-            Pull image
-          </Button>
+      <div class="w-full flex flex-row justify-end gap-3 my-3">
+        <Button type="secondary" class="mr-3 w-full" on:click={() => router.goto($lastPage.path)}>Cancel</Button>
+        {#if !matchingLocalImages.includes(imageToPull) && imageToPull !== ''}
+          {#if !pullFinished}
+            <Button
+              icon={faArrowCircleDown}
+              class="w-full"
+              bind:disabled={imageNameIsInvalid}
+              on:click={() => pullImage()}
+              bind:inProgress={pullInProgress}>
+              Pull image {console.log('pull image ' + imageToPull)}
+            </Button>
+          {:else}
+            <Button class="w-full" on:click={() => buildContainerFromImage()}>Select image</Button>
+          {/if}
         {:else}
-          <Button on:click={() => pullImageFinished()}>Done</Button>
+          <Button icon={faCircleCheck} class="w-full" on:click={() => buildContainerFromImage()}>Select image {console.log('select image ' + imageToPull)}</Button>
         {/if}
         {#if pullError}
           <ErrorMessage error={pullError} />
         {/if}
-        <RecommendedRegistry bind:imageError={pullError} imageName={imageToPull} />
       </div>
     </footer>
     <TerminalWindow bind:terminal={logsPull} />
   </div>
 </EngineFormPage>
+
