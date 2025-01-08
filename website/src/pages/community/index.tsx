@@ -80,6 +80,9 @@ export default function Home(): JSX.Element {
                 <li>
                   <a href={useBaseUrl('/docs/intro')}>Documentation</a>: Help us improve our docs.
                 </li>
+                <li>
+                  <a href={useBaseUrl('/tutorial')}>Tutorials</a>: Step-by-step guides to get started.
+                </li>
               </ul>
             </div>
 
@@ -91,29 +94,6 @@ export default function Home(): JSX.Element {
               </p>
             </div>
           </div>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-3xl mb-4">Resources for Developers</h2>
-          <ul className="list-disc list-inside space-y-2 dark:text-gray-700">
-            <li>
-              <a href={useBaseUrl('/docs/intro')}>Documentation</a>: Comprehensive guides and references.
-            </li>
-            <li>
-              <a href={useBaseUrl('/tutorial')}>Tutorials</a>: Step-by-step guides to get started.
-            </li>
-            <li>
-              <a href={useBaseUrl('/blog')}>Blog</a>: Latest updates, case studies, and community stories.
-            </li>
-          </ul>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="text-3xl mb-4">Stay Updated</h2>
-          <p className="dark:text-gray-700">
-            Never miss an update! Subscribe to our <a href="https://podman-desktop.io/newsletter">newsletter</a> for the
-            latest news, tips, and announcements.
-          </p>
         </section>
       </main>
     </Layout>
