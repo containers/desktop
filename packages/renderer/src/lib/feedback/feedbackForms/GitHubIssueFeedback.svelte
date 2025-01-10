@@ -44,7 +44,7 @@ let existingIssuesLink = $state(
 $effect(() => contentChange(Boolean(issueTitle || issueDescription)));
 
 onMount(async () => {
-  await window.telemetryTrack(`feedback.${category}FormOpened`);
+  await window.telemetryTrack(`feedback.FormOpened`, { feedbackCategory: category });
 });
 
 async function openGitHubIssues(): Promise<void> {
@@ -62,7 +62,7 @@ async function previewOnGitHub(): Promise<void> {
   };
   try {
     await window.previewOnGitHub(issueProperties);
-    await window.telemetryTrack(`feedback.${category}FormSubmitted`);
+    await window.telemetryTrack(`feedback.FormSubmitted`, { feedbackCategory: category });
     onCloseForm();
   } catch (error: unknown) {
     console.error('There was a problem with preview on GitHub', error);

@@ -245,7 +245,6 @@ describe('includeSystemInfo', () => {
   });
 });
 
-<<<<<<< HEAD
 describe('includeExtensionInfo', () => {
   test('should not be visible on category feature', async () => {
     const { includeExtensionInfo } = renderGitHubIssueFeedback({
@@ -293,7 +292,8 @@ describe('includeExtensionInfo', () => {
       }),
     );
   });
-=======
+});
+
 test.each(['bug', 'feature'])('Expect %s to have specific telemetry track events', async category => {
   const { title, description, preview } = renderGitHubIssueFeedback({
     category: category,
@@ -301,13 +301,13 @@ test.each(['bug', 'feature'])('Expect %s to have specific telemetry track events
     contentChange: vi.fn(),
   });
 
-  expect(window.telemetryTrack).toHaveBeenNthCalledWith(1, `feedback.${category}FormOpened`);
+  expect(window.telemetryTrack).toHaveBeenNthCalledWith(1, `feedback.FormOpened`, { feedbackCategory: category });
 
   await userEvent.type(title, 'Bug title');
   await userEvent.type(description, 'Bug description');
   await userEvent.click(preview);
 
   await vi.waitFor(() =>
-    expect(window.telemetryTrack).toHaveBeenNthCalledWith(2, `feedback.${category}FormSubmitteds`),
+    expect(window.telemetryTrack).toHaveBeenNthCalledWith(2, `feedback.FormSubmitted`, { feedbackCategory: category }),
   );
 });
