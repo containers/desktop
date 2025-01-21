@@ -19,7 +19,6 @@ interface Props {
   class?: string;
 }
 
-// the placeholder text displayed when no option is selected
 let {
   placeholder,
   required = false,
@@ -36,13 +35,13 @@ let {
   class: className,
 }: Props = $props();
 
-let input: HTMLInputElement;
-let list = $state<HTMLDivElement>();
+let inputDelayTimeout: NodeJS.Timeout | undefined = undefined;
+let input: HTMLInputElement | undefined = $state();
+let list: HTMLDivElement | undefined = $state();
 let scrollElements: HTMLElement[] = $state([]);
 let value: string = $state('');
 let items: string[] = $state([]);
 let itemHeadings: { [index: number]: string[] } = $state({});
-let inputDelayTimeout: NodeJS.Timeout;
 let opened: boolean = $state(false);
 let highlightIndex: number = $state(-1);
 let pageStep = 10;
