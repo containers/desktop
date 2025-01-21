@@ -12,8 +12,7 @@ interface Props {
   id?: string;
   name?: string;
   error?: boolean;
-  resultItems?: string[];
-  sort?: boolean;
+  resultItems?: GroupItem[];
   onInputChange?: (s: string) => Promise<void>;
   onChange?: (value: string) => void;
   onEnter?: () => void;
@@ -31,7 +30,6 @@ let {
   name,
   error = false,
   resultItems = [],
-  sort = false,
   onInputChange,
   onChange,
   onEnter,
@@ -42,19 +40,7 @@ let input: HTMLInputElement;
 let list = $state<HTMLDivElement>();
 let scrollElements: HTMLElement[] = $state([]);
 let value: string = $state('');
-let items: string[] = $derived(
-  sort
-    ? resultItems.toSorted((a: string, b: string) => {
-        if (a.startsWith(userValue) === b.startsWith(userValue)) {
-          return a.localeCompare(b);
-        } else if (a.startsWith(userValue) && !b.startsWith(userValue)) {
-          return -1;
-        } else {
-          return 1;
-        }
-      })
-    : resultItems,
-);
+let items: string[] = $state([]);
 let itemHeadings: { [index: number]: string[] } = $state({});
 let inputDelayTimeout: NodeJS.Timeout;
 let opened: boolean = $state(false);
@@ -69,7 +55,7 @@ $effect(() => {
   }
   let headings: { [index: number]: string[] } = {};
   let currentItems: string[] = [];
-  for (let { values, group, sorted } of groupValues) {
+  for (let { values, group, sorted } of resultItems) {
     if (group) {
       if (headings[currentItems.length]) {
         headings[currentItems.length].push(group);
