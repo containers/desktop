@@ -655,6 +655,7 @@ export class ProviderRegistry {
               name: connection.vmTypeDisplayName ?? connection.vmType,
             }
           : undefined,
+        version: connection.version?.(),
       };
     } else {
       providerConnection = {
