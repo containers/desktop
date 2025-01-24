@@ -148,7 +148,7 @@ export class PodmanConfiguration {
         rosetta: false as boolean,
       };
       const content = toml.stringify(containersConfContent);
-      await fs.promises.writeFile(this.getContainersFileLocation(), content);
+      fs.writeFileSync(this.getContainersFileLocation(), content);
     } else if (fs.existsSync(this.getContainersFileLocation())) {
       // Read the file
       const containersConfigFile = await this.readContainersConfigFile();
@@ -185,7 +185,7 @@ export class PodmanConfiguration {
 
       // Write the file
       const content = toml.stringify(containersConfContent);
-      await fs.promises.writeFile(this.getContainersFileLocation(), content);
+      fs.writeFileSync(this.getContainersFileLocation(), content);
     }
   }
 
@@ -215,7 +215,7 @@ export class PodmanConfiguration {
 
       // write the file
       const content = toml.stringify(containersConfContent);
-      await fs.promises.writeFile(this.getContainersFileLocation(), content);
+      fs.writeFileSync(this.getContainersFileLocation(), content);
     } else {
       // read the content of the file
       const containersConfigFile = await this.readContainersConfigFile();
@@ -298,7 +298,7 @@ export class PodmanConfiguration {
       containersConfContent['engine'].env = engineEnv;
       // write the file
       const content = toml.stringify(containersConfContent);
-      await fs.promises.writeFile(this.getContainersFileLocation(), content);
+      fs.writeFileSync(this.getContainersFileLocation(), content);
     }
   }
 
