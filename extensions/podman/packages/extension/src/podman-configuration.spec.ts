@@ -81,7 +81,7 @@ test('when enable rosetta is set to true and there is already a file with rosett
 memory = 4096
 rosetta = false
     `;
-  vi.spyOn(fs.promises, 'writeFile').mockResolvedValue();
+  vi.spyOn(fs, 'writeFileSync').mockResolvedValue();
   vi.spyOn(podmanConfiguration, 'readContainersConfigFile').mockResolvedValue(configFileContent);
   vi.spyOn(fs, 'existsSync').mockImplementation(() => {
     return true;
@@ -89,7 +89,7 @@ rosetta = false
 
   await podmanConfiguration.updateRosettaSetting(true);
 
-  expect(fs.promises.writeFile).toHaveBeenCalledWith(
+  expect(fs.writeFileSync).toHaveBeenCalledWith(
     podmanConfiguration.getContainersFileLocation(),
     // Expect that the write file did not contain any rosetta references
     expect.not.stringContaining('rosetta'),
@@ -103,7 +103,7 @@ test('should disable Rosetta when useRosetta is false', async () => {
 memory = 4096
 rosetta = true
     `;
-  vi.spyOn(fs.promises, 'writeFile').mockResolvedValue();
+  vi.spyOn(fs, 'writeFileSync').mockResolvedValue();
   vi.spyOn(podmanConfiguration, 'readContainersConfigFile').mockResolvedValue(configFileContent);
   vi.spyOn(fs, 'existsSync').mockImplementation(() => {
     return true;
@@ -111,7 +111,7 @@ rosetta = true
 
   await podmanConfiguration.updateRosettaSetting(false);
 
-  expect(fs.promises.writeFile).toHaveBeenCalledWith(
+  expect(fs.writeFileSync).toHaveBeenCalledWith(
     podmanConfiguration.getContainersFileLocation(),
     expect.stringContaining('rosetta = false'),
   );
@@ -119,7 +119,7 @@ rosetta = true
 
 test('if rosetta is set to true and the file does NOT exist, do not try and create the file.', async () => {
   vi.mock('node:fs');
-  vi.spyOn(fs.promises, 'writeFile').mockResolvedValue();
+  vi.spyOn(fs, 'writeFileSync').mockResolvedValue();
   vi.spyOn(podmanConfiguration, 'readContainersConfigFile').mockResolvedValue('');
   vi.spyOn(fs, 'existsSync').mockImplementation(() => {
     return false;
@@ -127,13 +127,13 @@ test('if rosetta is set to true and the file does NOT exist, do not try and crea
 
   await podmanConfiguration.updateRosettaSetting(true);
 
-  expect(fs.promises.writeFile).not.toHaveBeenCalled();
+  expect(fs.writeFileSync).not.toHaveBeenCalled();
 });
 
 describe('isRosettaEnabled', () => {
   test('check rosetta is enabled', async () => {
     vi.mock('node:fs');
-    vi.spyOn(fs.promises, 'readFile').mockResolvedValue('');
+    vi.spyOn(fs, 'writeFileSync').mockResolvedValue();
     vi.spyOn(podmanConfiguration, 'readContainersConfigFile').mockResolvedValue('[machine]\nrosetta=true');
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
 
@@ -144,7 +144,7 @@ describe('isRosettaEnabled', () => {
 
   test('check rosetta is enabled if file is not containing rosetta setting (default value is true)', async () => {
     vi.mock('node:fs');
-    vi.spyOn(fs.promises, 'readFile').mockResolvedValue('');
+    vi.spyOn(fs, 'writeFileSync').mockResolvedValue();
     vi.spyOn(podmanConfiguration, 'readContainersConfigFile').mockResolvedValue('');
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
 
@@ -155,7 +155,7 @@ describe('isRosettaEnabled', () => {
 
   test('check rosetta is disabled', async () => {
     vi.mock('node:fs');
-    vi.spyOn(fs.promises, 'readFile').mockResolvedValue('');
+    vi.spyOn(fs, 'writeFileSync').mockResolvedValue();
     vi.spyOn(podmanConfiguration, 'readContainersConfigFile').mockResolvedValue('[machine]\nrosetta=false');
 
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
