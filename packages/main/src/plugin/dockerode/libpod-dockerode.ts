@@ -828,6 +828,7 @@ export class LibpodDockerode {
             }
           }
         }
+
         return originalBuildRequest.call(this, options, context, data, callback);
       };
 
