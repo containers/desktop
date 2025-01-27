@@ -21,8 +21,10 @@ import { onDestroy, onMount } from 'svelte';
 let callback: (object: { type: string; message: string }) => void;
 
 onMount(() => {
-  callback = (object: { type: string; message: string }) => {
-    let theme: any = {};
+  callback = (object: { type: string; message: string }): void => {
+    let theme: {
+      [x: string]: string;
+    } = {};
     if (object.type === 'success') {
       theme = {
         '--toastBackground': '#16a34a',
@@ -58,7 +60,7 @@ onMount(() => {
 });
 
 onDestroy(() => {
-  callback = () => {};
+  callback = (): void => {};
 });
 </script>
 

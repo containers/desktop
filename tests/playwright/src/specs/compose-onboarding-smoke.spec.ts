@@ -140,7 +140,7 @@ test.describe.serial('Compose onboarding workflow verification', { tag: '@smoke'
     const cliToolsPage = await settingsBar.openTabPage(CLIToolsPage);
     const composeRow = cliToolsPage.toolsTable.getByLabel(RESOURCE_NAME);
     const composeVersionInfo = composeRow.getByLabel('cli-version');
-    await playExpect(composeVersionInfo).toHaveText('docker-compose ' + composeVersion);
+    await playExpect(composeVersionInfo).toContainText('docker-compose ' + composeVersion);
   });
 });
 

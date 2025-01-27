@@ -27,7 +27,7 @@ import PreferencesResourcesRenderingCopyButton from './PreferencesResourcesRende
 const getOsPlatformMock = vi.fn();
 
 beforeEach(() => {
-  (window as any).getOsPlatform = getOsPlatformMock;
+  Object.defineProperty(window, 'getOsPlatform', { value: getOsPlatformMock });
 });
 
 describe('Windows', () => {
@@ -66,10 +66,8 @@ describe('Linux', () => {
   });
 });
 
-async function waitRender(socketPath: string) {
-  const result = render(PreferencesResourcesRenderingCopyButton, { path: socketPath });
+async function waitRender(socketPath: string): Promise<void> {
+  render(PreferencesResourcesRenderingCopyButton, { path: socketPath });
   await tick();
   await tick();
-
-  return result;
 }

@@ -3,7 +3,7 @@ sidebar_position: 6
 title: Deleting a cluster
 description: Deleting your local Kind-powered Kubernetes cluster.
 keywords: [podman desktop, podman, containers, migrating, kubernetes, kind]
-tags: [migrating-to-kubernetes, kind]
+tags: [deleting-a-kind-cluster, kind]
 ---
 
 # Deleting your local Kind-powered Kubernetes cluster

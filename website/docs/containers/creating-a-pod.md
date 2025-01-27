@@ -19,27 +19,28 @@ Consider running containers in a pod to:
 
 - You are using the Podman container engine.
 - Your containers, such as `database` and `frontend`, running or stopped, are available on the Containers page.
-- The `frontend` container is configured to access the service exposed by the `database` container on localhost, such as `localhost:6379`.
+- The `frontend` container is configured to access the service exposed by the `database` container on localhost, such as `localhost:5000`.
 
 #### Procedure
 
-1. Go to **<Icon icon="fa-solid fa-cube" size="lg" /> Containers**.
-1. Click the checkbox in the container line for your containers, such as `database` and `frontend`.
-1. Click **<Icon icon="fa-solid fa-cubes" size="lg" />**.
-1. In the **Copy containers to a pod** screen:
-   1. **Name of the pod**: enter your pod name, such as `my-pod`.
-   1. **All selected ports will be exposed**:
-      1. Select `frontend`.
-      1. Clear `database`.
-1. Click **<Icon icon="fa-solid fa-cube" size="lg" /> Create Pod**.
+1. Go to **Containers** from the left navigation pane.
+1. Select the containers, such as `database` and `frontend`.
+   ![selecting containers](img/selecting-containers.png)
+1. Click **Create Pod**.
+1. Optional: Edit the name of the pod. The default name is `my-pod`.
+1. Check that the correct ports are exposed.
+1. Click **Create Pod**.
+   ![create pod button](img/create-pod-button.png)
 
 #### Verification
 
-1. Go to **<Icon icon="fa-solid fa-cubes" size="lg" /> Pods**.
-1. Click your pod, such as `my-pod`.
-1. Go to **Logs**: see the combined logs from the two containers.
-1. Go to **Summary**: see the containers.
-1. Click `frontend-podified`.
-1. Click **<Icon icon="fa-solid fa-external-link" size="lg" />**.
-1. Your browser opens the service exposed by your `frontend-podified` container.
-1. Go to **<Icon icon="fa-solid fa-cube" size="lg" /> Containers**: see the running containers.
+1. View the newly created pod on the **Pods** component page.
+   ![pod created successfully](img/pod-created-successfully.png)
+1. Click the name of the pod to view its logs.
+1. Click the **Open Browser** icon. Your browser opens the service exposed by your `frontend-podified` container.
+   ![open browser icon](img/open-browser-icon.png)
+
+#### Additional resources
+
+- [Blog- Creating a pod](https://podman-desktop.io/blog/2024/10/05/kubernetes-blog#creating-a-pod)
+- [Managing containers and pods](https://podman-desktop.io/tutorial/managing-your-application-resources#managing-containers-and-pods)

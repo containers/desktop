@@ -2,7 +2,7 @@
   "name": "compose",
   "displayName": "Compose",
   "description": "Install Compose binary to work with Podman",
-  "version": "1.16.0-next",
+  "version": "1.17.0-next",
   "icon": "icon.png",
   "publisher": "podman-desktop",
   "license": "Apache-2.0",
@@ -157,7 +157,7 @@
     "watch": "vite build --watch"
   },
   "dependencies": {
-    "@octokit/rest": "^21.0.2",
+    "@octokit/rest": "^21.1.0",
     "mustache": "^4.2.0",
     "shell-path": "^3.0.0"
   },
@@ -166,7 +166,7 @@
     "@types/mustache": "^4.2.5",
     "adm-zip": "^0.5.16",
     "mkdirp": "^3.0.1",
-    "vite": "^6.0.7",
+    "vite": "^6.0.11",
     "vitest": "^2.1.6"
   }
 }

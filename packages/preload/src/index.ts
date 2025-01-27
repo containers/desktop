@@ -57,6 +57,7 @@ import type { ContainerInspectInfo } from '/@api/container-inspect-info';
 import type { ContainerStatsInfo } from '/@api/container-stats-info';
 import type { ContributionInfo } from '/@api/contribution-info';
 import type { DockerSocketMappingStatusInfo } from '/@api/docker-compatibility-info';
+import type { ExtensionDevelopmentFolderInfo } from '/@api/extension-development-folders-info';
 import type { ExtensionInfo } from '/@api/extension-info';
 import type { FeedbackProperties, GitHubIssue } from '/@api/feedback';
 import type { HistoryInfo } from '/@api/history-info';
@@ -71,6 +72,8 @@ import type { ContextHealth } from '/@api/kubernetes-contexts-healths';
 import type { ContextPermission } from '/@api/kubernetes-contexts-permissions';
 import type { ContextGeneralState, ResourceName } from '/@api/kubernetes-contexts-states';
 import type { ForwardConfig, ForwardOptions } from '/@api/kubernetes-port-forward-model';
+import type { ResourceCount } from '/@api/kubernetes-resource-count';
+import type { KubernetesContextResources } from '/@api/kubernetes-resources';
 import type { ManifestCreateOptions, ManifestInspectInfo, ManifestPushOptions } from '/@api/manifest-info';
 import type { NetworkInspectInfo } from '/@api/network-info';
 import type { NotificationCard, NotificationCardOptions } from '/@api/notification';
@@ -100,7 +103,7 @@ import type {
   ContainerCreateOptions as PodmanContainerCreateOptions,
   PlayKubeInfo,
 } from '../../main/src/plugin/dockerode/libpod-dockerode';
-import type { CatalogExtension } from '../../main/src/plugin/extensions-catalog/extensions-catalog-api';
+import type { CatalogExtension } from '../../main/src/plugin/extension/catalog/extensions-catalog-api';
 import type { FeaturedExtension } from '../../main/src/plugin/featured/featured-api';
 import type {
   GenerateKubeResult,
@@ -1881,6 +1884,17 @@ export function initExposure(): void {
     return ipcInvoke('kubernetes:getContextsPermissions');
   });
 
+  contextBridge.exposeInMainWorld('kubernetesGetResourcesCount', async (): Promise<ResourceCount[]> => {
+    return ipcInvoke('kubernetes:getResourcesCount');
+  });
+
+  contextBridge.exposeInMainWorld(
+    'kubernetesGetResources',
+    async (resourceName: string): Promise<KubernetesContextResources[]> => {
+      return ipcInvoke('kubernetes:getResources', resourceName);
+    },
+  );
+
   contextBridge.exposeInMainWorld('kubernetesGetClusters', async (): Promise<Cluster[]> => {
     return ipcInvoke('kubernetes-client:getClusters');
   });
@@ -2377,6 +2391,21 @@ export function initExposure(): void {
 
   contextBridge.exposeInMainWorld('pathRelative', async (from: string, to: string): Promise<string> => {
     return ipcInvoke('path:relative', from, to);
+  });
+
+  contextBridge.exposeInMainWorld(
+    'listExtensionDevelopmentFolders',
+    async (): Promise<ExtensionDevelopmentFolderInfo[]> => {
+      return ipcInvoke('extension-development-folders:getDevelopmentFolders');
+    },
+  );
+
+  contextBridge.exposeInMainWorld('untrackExtensionFolder', async (path: string): Promise<void> => {
+    return ipcInvoke('extension-development-folders:removeDevelopmentFolder', path);
+  });
+
+  contextBridge.exposeInMainWorld('trackExtensionFolder', async (path: string): Promise<void> => {
+    return ipcInvoke('extension-development-folders:addDevelopmentFolder', path);
   });
 }
 

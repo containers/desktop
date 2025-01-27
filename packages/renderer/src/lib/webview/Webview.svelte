@@ -21,7 +21,7 @@ let webviewInfo: WebviewInfo | undefined;
 
 $: webviewInfo = get(webviews).find(webview => webview.id === id);
 
-const notifyNewWebwievState = () => {
+const notifyNewWebwievState = (): void => {
   if (webviewInfo) {
     window
       .makeDefaultWebviewVisible(webviewInfo.id)
@@ -34,28 +34,43 @@ $: webviewInfo && notifyNewWebwievState();
 let webviewElement: HTMLElement | undefined;
 
 // function to notify webview when messages are coming
-const postMessageToWebview = (webviewEvent: unknown) => {
+const postMessageToWebview = (webviewEvent: unknown): void => {
   const webviewEventTyped = webviewEvent as { id: string; message: unknown };
-  if (id === webviewEventTyped.id) {
-    (webviewElement as any)?.send('webview-post-message', { message: webviewEventTyped.message });
+  if (
+    id === webviewEventTyped.id &&
+    webviewElement &&
+    'send' in webviewElement &&
+    typeof webviewElement.send === 'function'
+  ) {
+    webviewElement.send('webview-post-message', { message: webviewEventTyped.message });
   }
 };
 
 // call postMessageToWebview when receiving messages from the main process
 const webviewPostMessageDisposable = window.events?.receive('webview-post-message', postMessageToWebview);
 
-const updateHtmlOfWebview = (webviewEvent: unknown) => {
+const updateHtmlOfWebview = (webviewEvent: unknown): void => {
   const webviewEventTyped = webviewEvent as { id: string; html: string };
-  if (id === webviewEventTyped.id) {
-    (webviewElement as any)?.send('webview-update-html', webviewEventTyped.html);
+  if (
+    id === webviewEventTyped.id &&
+    webviewElement &&
+    'send' in webviewElement &&
+    typeof webviewElement.send === 'function'
+  ) {
+    webviewElement.send('webview-update-html', webviewEventTyped.html);
   }
 };
 
 const webviewUpdateHtmlDisposable = window.events?.receive('webview-update:html', updateHtmlOfWebview);
 
 const openDevtoolsDisposable = window.events?.receive('dev-tools:open-webview', (id: unknown) => {
-  if (id === webviewInfo?.id) {
-    (webviewElement as any)?.openDevTools();
+  if (
+    id === webviewInfo?.id &&
+    webviewElement &&
+    'openDevTools' in webviewElement &&
+    typeof webviewElement.openDevTools === 'function'
+  ) {
+    webviewElement.openDevTools();
   }
 });
 

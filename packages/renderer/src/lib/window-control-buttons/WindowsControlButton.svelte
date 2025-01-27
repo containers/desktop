@@ -1,5 +1,5 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { type Component, onMount } from 'svelte';
 
 import WindowsExitIcon from '/@/lib/images/WindowsExitIcon.svelte';
 import WindowsMaxIcon from '/@/lib/images/WindowsMaxIcon.svelte';
@@ -7,7 +7,7 @@ import WindowsMinIcon from '/@/lib/images/WindowsMinIcon.svelte';
 import WindowsUnmaxIcon from '/@/lib/images/WindowsUnmaxIcon.svelte';
 
 const iconSize = '16';
-let icon: any;
+let icon: Component;
 let state = 'initial';
 
 export let name: string;
@@ -27,7 +27,7 @@ onMount(() => {
   titleName = name;
 });
 
-function executeAction() {
+function executeAction(): void {
   // perform action
   action();
 
@@ -55,7 +55,7 @@ function executeAction() {
 </script>
 
 <button
-  on:click={() => executeAction()}
+  on:click={executeAction}
   aria-label={name}
   title={titleName}
   class="h-[32px] w-[45px] cursor-pointer {name === 'Close'

@@ -9,6 +9,7 @@ export let badge: string = '';
 export let isDefault: boolean = false;
 export let checked: boolean = false;
 export let value: string = '';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export let icon: any | undefined = '';
 let iconType: 'fontAwesome' | 'unknown' | undefined = undefined;
 
@@ -31,14 +32,14 @@ export let onCard: (obj: { mode: 'add' | 'remove'; value: string }) => void = ob
   dispatch('card', obj);
 };
 
-function handleKeydownAdditionalField(event: KeyboardEvent) {
+function handleKeydownAdditionalField(event: KeyboardEvent): void {
   if (event.key === 'Enter') {
     onAddcard({ value: additionalValue });
     displayValueFieldInput = false;
   }
 }
 
-function handleClick() {
+function handleClick(): void {
   if (additionalItem) {
     // display the new field input
     displayValueFieldInput = true;
@@ -88,11 +89,11 @@ onMount(() => {
     ? 'border-[var(--pd-content-card-border-selected)]'
     : 'border-[var(--pd-content-card-border)]'} border-2 flex flex-col"
   aria-label={value}
-  on:click|preventDefault={() => handleClick()}>
+  on:click|preventDefault={handleClick}>
   <div class="flex flex-row">
     <div class="flex flex-col">
       {#if !additionalItem}
-        <Checkbox bind:checked={checked} title={title} on:click={() => handleClick()} />
+        <Checkbox bind:checked={checked} title={title} on:click={handleClick} />
       {:else}
         <Fa class="text-[var(--pd-content-card-icon)] cursor-pointer" icon={faPlusCircle} size="1.5x" />
       {/if}

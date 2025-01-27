@@ -28,6 +28,7 @@ let shortnameImages: string[] = [];
 let podmanFQN = '';
 let usePodmanFQN = false;
 let isValidName = true;
+let searchResult: string[] = [];
 
 export let imageToPull: string | undefined = undefined;
 
@@ -63,7 +64,7 @@ async function resolveShortname(): Promise<void> {
   }
 }
 
-function callback(event: PullEvent) {
+function callback(event: PullEvent): void {
   let lineIndexToWrite;
   if (event.status && event.id) {
     const lineNumber = lineNumberPerId.get(event.id);
@@ -104,7 +105,7 @@ function callback(event: PullEvent) {
   }
 }
 
-async function pullImage() {
+async function pullImage(): Promise<void> {
   if (!selectedProviderConnection) {
     pullError = 'No current provider connection';
     return;
@@ -134,18 +135,19 @@ async function pullImage() {
     }
     pullInProgress = false;
     pullFinished = true;
-  } catch (error: any) {
-    const errorMessage = error.message ? error.message : error;
+  } catch (error: unknown) {
+    const errorMessage =
+      error && typeof error === 'object' && 'message' in error && error.message ? error.message : error;
     pullError = `Error while pulling image from ${selectedProviderConnection.name}: ${errorMessage}`;
     pullInProgress = false;
   }
 }
 
-async function pullImageFinished() {
+async function pullImageFinished(): Promise<void> {
   router.goto('/images');
 }
 
-async function gotoManageRegistries() {
+async function gotoManageRegistries(): Promise<void> {
   router.goto('/preferences/registries');
 }
 
@@ -158,7 +160,7 @@ onMount(() => {
 let imageNameInvalid: string | undefined = undefined;
 let imageNameIsInvalid = imageToPull === undefined || imageToPull.trim() === '';
 function validateImageName(image: string): void {
-  if (imageToPull && (image === undefined || image.trim() === '')) {
+  if (image === undefined || image.trim() === '') {
     imageNameIsInvalid = true;
     imageNameInvalid = 'Please enter a value';
   } else {
@@ -244,6 +246,25 @@ function checkIfTagExist(image: string, tags: string[]): void {
 
   isValidName = tags.some(t => t === tag);
 }
+
+async function searchFunction(value: string): Promise<void> {
+  try {
+    searchResult = (await searchImages(value)).toSorted((a: string, b: string) => {
+      const dockerIoValue = `docker.io/${value}`;
+      const aStartsWithValue = a.startsWith(value) || a.startsWith(dockerIoValue);
+      const bStartsWithValue = b.startsWith(value) || b.startsWith(dockerIoValue);
+      if (aStartsWithValue === bStartsWithValue) {
+        return a.localeCompare(b);
+      } else if (aStartsWithValue && !bStartsWithValue) {
+        return -1;
+      } else {
+        return 1;
+      }
+    });
+  } catch (error: unknown) {
+    searchResult = [];
+  }
+}
 </script>
 
 <EngineFormPage
@@ -255,7 +276,7 @@ function checkIfTagExist(image: string, tags: string[]): void {
   </svelte:fragment>
 
   <svelte:fragment slot="actions">
-    <Button on:click={() => gotoManageRegistries()} icon={faCog}>Manage registries</Button>
+    <Button on:click={gotoManageRegistries} icon={faCog}>Manage registries</Button>
   </svelte:fragment>
 
   <div slot="content" class="space-y-6">
@@ -267,8 +288,9 @@ function checkIfTagExist(image: string, tags: string[]): void {
           id="imageName"
           name="imageName"
           placeholder="Image name"
-          searchFunction={searchImages}
-          onChange={async (s: string) => {
+          onInputChange={searchFunction}
+          resultItems={searchResult}
+          onChange={async (s: string): Promise<void> => {
             validateImageName(s);
             await resolveShortname();
             await searchLatestTag();
@@ -322,12 +344,12 @@ function checkIfTagExist(image: string, tags: string[]): void {
           <Button
             icon={faArrowCircleDown}
             bind:disabled={imageNameIsInvalid}
-            on:click={() => pullImage()}
+            on:click={pullImage}
             bind:inProgress={pullInProgress}>
             Pull image
           </Button>
         {:else}
-          <Button on:click={() => pullImageFinished()}>Done</Button>
+          <Button on:click={pullImageFinished}>Done</Button>
         {/if}
         {#if pullError}
           <ErrorMessage error={pullError} />

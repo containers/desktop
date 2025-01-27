@@ -36,7 +36,7 @@ class VolumeInfoUIImpl {
     this.#status = initialStatus;
   }
 
-  get status() {
+  get status(): string {
     return this.#status;
   }
   set status(status: string) {
@@ -45,8 +45,8 @@ class VolumeInfoUIImpl {
 }
 
 beforeAll(() => {
-  (window as any).showMessageBox = showMessageBoxMock;
-  (window as any).removeVolume = removeVolumeMock;
+  Object.defineProperty(window, 'showMessageBox', { value: showMessageBoxMock });
+  Object.defineProperty(window, 'removeVolume', { value: removeVolumeMock });
 });
 
 test('Expect prompt dialog and deletion', async () => {

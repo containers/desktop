@@ -10,7 +10,6 @@ import {
   TableRow,
 } from '@podman-desktop/ui-svelte';
 import moment from 'moment';
-import { onMount } from 'svelte';
 
 import KubeActions from '/@/lib/kube/KubeActions.svelte';
 import KubernetesCurrentContextConnectionBadge from '/@/lib/ui/KubernetesCurrentContextConnectionBadge.svelte';
@@ -30,22 +29,24 @@ import DeploymentColumnStatus from './DeploymentColumnStatus.svelte';
 import DeploymentEmptyScreen from './DeploymentEmptyScreen.svelte';
 import type { DeploymentUI } from './DeploymentUI';
 
-export let searchTerm = '';
-$: deploymentSearchPattern.set(searchTerm);
+interface Props {
+  searchTerm?: string;
+}
 
-let deployments: DeploymentUI[] = [];
+let { searchTerm = '' }: Props = $props();
 
-const deploymentUtils = new DeploymentUtils();
-
-onMount(() => {
-  return kubernetesCurrentContextDeploymentsFiltered.subscribe(value => {
-    deployments = value.map(deployment => deploymentUtils.getDeploymentUI(deployment));
-  });
+$effect(() => {
+  deploymentSearchPattern.set(searchTerm);
 });
 
+const deploymentUtils = new DeploymentUtils();
+const deployments = $derived(
+  $kubernetesCurrentContextDeploymentsFiltered.map(deployment => deploymentUtils.getDeploymentUI(deployment)),
+);
+
 // delete the items selected in the list
-let bulkDeleteInProgress = false;
-async function deleteSelectedDeployments() {
+let bulkDeleteInProgress = $state<boolean>(false);
+async function deleteSelectedDeployments(): Promise<void> {
   const selectedDeployments = deployments.filter(deployment => deployment.selected);
   if (selectedDeployments.length === 0) {
     return;
@@ -54,7 +55,6 @@ async function deleteSelectedDeployments() {
   // mark deployments for deletion
   bulkDeleteInProgress = true;
   selectedDeployments.forEach(image => (image.status = 'DELETING'));
-  deployments = deployments;
 
   await Promise.all(
     selectedDeployments.map(async deployment => {
@@ -68,19 +68,19 @@ async function deleteSelectedDeployments() {
   bulkDeleteInProgress = false;
 }
 
-let selectedItemsNumber: number;
+let selectedItemsNumber = $state<number>(0);
 let table: Table;
 
 let statusColumn = new TableColumn<DeploymentUI>('Status', {
   align: 'center',
   width: '70px',
   renderer: DeploymentColumnStatus,
-  comparator: (a, b) => a.status.localeCompare(b.status),
+  comparator: (a, b): number => a.status.localeCompare(b.status),
 });
 
 let nameColumn = new TableColumn<DeploymentUI>('Name', {
   renderer: DeploymentColumnName,
-  comparator: (a, b) => a.name.localeCompare(b.name),
+  comparator: (a, b): number => a.name.localeCompare(b.name),
 });
 
 let conditionsColumn = new TableColumn<DeploymentUI>('Conditions', {
@@ -94,9 +94,9 @@ let podsColumn = new TableColumn<DeploymentUI>('Pods', {
 });
 
 let ageColumn = new TableColumn<DeploymentUI, Date | undefined>('Age', {
-  renderMapping: deployment => deployment.created,
+  renderMapping: (deployment): Date | undefined => deployment.created,
   renderer: TableDurationColumn,
-  comparator: (a, b) => moment(b.created).diff(moment(a.created)),
+  comparator: (a, b): number => moment(b.created).diff(moment(a.created)),
 });
 
 const columns = [
@@ -108,7 +108,7 @@ const columns = [
   new TableColumn<DeploymentUI>('Actions', { align: 'right', renderer: DeploymentColumnActions }),
 ];
 
-const row = new TableRow<DeploymentUI>({ selectable: _deployment => true });
+const row = new TableRow<DeploymentUI>({ selectable: (_deployment): boolean => true });
 </script>
 
 <NavPage bind:searchTerm={searchTerm} title="deployments">
@@ -119,7 +119,7 @@ const row = new TableRow<DeploymentUI>({ selectable: _deployment => true });
   <svelte:fragment slot="bottom-additional-actions">
     {#if selectedItemsNumber > 0}
       <Button
-        on:click={() =>
+        on:click={(): void =>
           withBulkConfirmation(
             deleteSelectedDeployments,
             `delete ${selectedItemsNumber} deployment${selectedItemsNumber > 1 ? 's' : ''}`,
@@ -142,8 +142,7 @@ const row = new TableRow<DeploymentUI>({ selectable: _deployment => true });
       data={deployments}
       columns={columns}
       row={row}
-      defaultSortColumn="Name"
-      on:update={() => (deployments = deployments)}>
+      defaultSortColumn="Name">
     </Table>
 
     {#if $kubernetesCurrentContextDeploymentsFiltered.length === 0}
@@ -152,7 +151,7 @@ const row = new TableRow<DeploymentUI>({ selectable: _deployment => true });
           icon={DeploymentIcon}
           kind="deployments"
           searchTerm={searchTerm}
-          on:resetFilter={() => (searchTerm = '')} />
+          on:resetFilter={(): string => (searchTerm = '')} />
       {:else}
         <DeploymentEmptyScreen />
       {/if}

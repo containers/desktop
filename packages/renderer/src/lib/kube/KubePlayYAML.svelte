@@ -37,6 +37,7 @@ let currentNamespace: string | undefined;
 let allNamespaces: V1NamespaceList;
 
 let playKubeResultRaw: string;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let playKubeResultJSON: any;
 
 let userChoice: 'podman' | 'kubernetes' = 'podman';
@@ -62,12 +63,12 @@ const kubeFileDialogOptions: OpenDialogOptions = {
   ],
 };
 
-function removeEmptyOrNull(obj: any) {
-  Object.keys(obj).forEach(
-    k =>
-      (obj[k] && typeof obj[k] === 'object' && removeEmptyOrNull(obj[k])) ||
-      (!obj[k] && obj[k] !== undefined && delete obj[k]),
-  );
+function removeEmptyOrNull(obj: object): object {
+  Object.keys(obj).forEach(k => {
+    const val = obj[k as keyof typeof obj];
+    (val && typeof val === 'object' && removeEmptyOrNull(val)) ||
+      (!val && val !== undefined && delete obj[k as keyof typeof obj]);
+  });
   return obj;
 }
 
@@ -91,12 +92,14 @@ async function playKubeFile(): Promise<void> {
         if (playKubeResultJSON.Pods.length > 0) {
           // Filter out the pods that have container errors, but check to see that container errors exists first
           const containerErrors = playKubeResultJSON.Pods.filter(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (pod: any) => pod.ContainerErrors && pod.ContainerErrors.length > 0,
           );
 
           // For each Pod that has container errors, we will add the container errors to the warning message
           if (containerErrors.length > 0) {
             runWarning = `The following pods were created but failed to start: ${containerErrors
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .map((pod: any) => pod.ContainerErrors.join(', '))
               .join(', ')}`;
           }
@@ -200,7 +203,7 @@ function goBackToPodsPage(): void {
           aria-pressed={userChoice === 'podman' ? 'true' : 'false'}
           class:border-[var(--pd-content-card-border-selected)]={userChoice === 'podman'}
           class:border-[var(--pd-content-card-border)]={userChoice !== 'podman'}
-          on:click={() => {
+          on:click={(): void => {
             userChoice = 'podman';
           }}>
           <div class="flex flex-row align-middle items-center">
@@ -247,7 +250,7 @@ function goBackToPodsPage(): void {
           aria-pressed={userChoice === 'kubernetes' ? 'true' : 'false'}
           class:border-[var(--pd-content-card-border-selected)]={userChoice === 'kubernetes'}
           class:border-[var(--pd-content-card-border)]={userChoice !== 'kubernetes'}
-          on:click={() => {
+          on:click={(): void => {
             userChoice = 'kubernetes';
           }}>
           <div class="flex flex-row align-middle items-center">
@@ -309,7 +312,7 @@ function goBackToPodsPage(): void {
 
       {#if !runFinished}
         <Button
-          on:click={() => playKubeFile()}
+          on:click={playKubeFile}
           disabled={hasInvalidFields || runStarted}
           class="w-full"
           bind:inProgress={runStarted}
@@ -351,7 +354,7 @@ function goBackToPodsPage(): void {
       {/if}
 
       {#if runFinished}
-        <Button on:click={() => goBackToPodsPage()} class="w-full">Done</Button>
+        <Button on:click={goBackToPodsPage} class="w-full">Done</Button>
       {/if}
     </div>
   </EngineFormPage>

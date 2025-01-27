@@ -1,4 +1,5 @@
 ---
+sidebar_position: 2
 title: Existing Kubernetes
 description: Configuring access to a Kubernetes cluster
 keywords: [podman desktop, podman, containers, pods, migrating, kubernetes]
@@ -21,7 +22,7 @@ You can also use the Kubernetes CLI to configure access to your Kubernetes clust
 
 #### Procedure
 
-1. (Optionally) Go to **<Icon icon="fa-solid fa-cog" size="lg" /> Settings > Preferences > Path to the kubeconfig file** to adapt your kubeconfig file location, when different from the default `$HOME/.kube/config`.
+1. (Optionally) Go to **<Icon icon="fa-solid fa-cog" size="lg" /> Settings > Preferences > Kubernetes** to adapt your kubeconfig file location, when different from the default `$HOME/.kube/config`.
 1. Register your _`<my_kubernetes>`_ Kubernetes cluster:
 
    ```shell-session

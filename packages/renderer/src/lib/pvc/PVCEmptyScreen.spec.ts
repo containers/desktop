@@ -41,11 +41,11 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.subscribeMock.mockImplementation(listener => {
     listener(mocks.getCurrentKubeContextState());
-    return { unsubscribe: () => {} };
+    return { unsubscribe: (): void => {} };
   });
 
-  (window as any).events = mocks.eventsMocks;
-  (window as any).kubernetesGetContextsGeneralState = mocks.getCurrentKubeContextState;
+  Object.defineProperty(window, 'events', { value: mocks.eventsMocks });
+  Object.defineProperty(window, 'kubernetesGetContextsGeneralState', { value: mocks.getCurrentKubeContextState });
 });
 
 test('Expect PVC empty screen', async () => {

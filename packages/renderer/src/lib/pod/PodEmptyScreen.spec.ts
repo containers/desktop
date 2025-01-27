@@ -35,13 +35,13 @@ vi.mock('/@/stores/providers', async () => {
 });
 
 beforeAll(() => {
-  (window as any).createPod = vi.fn();
-  (window as any).showMessageBox = vi.fn();
-  (window as any).clipboardWriteText = vi.fn();
-  (window as any).pullImage = vi.fn();
-  (window as any).listImages = vi.fn();
-  (window as any).createAndStartContainer = vi.fn();
-  (window as any).getProviderInfos = vi.fn();
+  Object.defineProperty(window, 'createPod', { value: vi.fn(), writable: true });
+  Object.defineProperty(window, 'showMessageBox', { value: vi.fn() });
+  Object.defineProperty(window, 'clipboardWriteText', { value: vi.fn() });
+  Object.defineProperty(window, 'pullImage', { value: vi.fn() });
+  Object.defineProperty(window, 'listImages', { value: vi.fn() });
+  Object.defineProperty(window, 'createAndStartContainer', { value: vi.fn(), writable: true });
+  Object.defineProperty(window, 'getProviderInfos', { value: vi.fn() });
   providerInfos.set([
     {
       containerConnections: [
@@ -55,7 +55,6 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(window.showMessageBox).mockResolvedValue(undefined as any);
 });
 
 const helloImage = 'quay.io/podman/hello:latest';
@@ -82,7 +81,7 @@ const imageInfo = {
 const podInfo = { engineId: imageInfo.engineId, Id: 'Id' };
 const podCreateCommand = `podman run -dt --pod new:myFirstPod ${helloImage}`;
 
-function testComponent(name: string, fn: () => Promise<unknown>) {
+function testComponent(name: string, fn: () => Promise<unknown>): void {
   test(name, () => {
     vi.mocked(window.listImages).mockResolvedValue([imageInfo]);
     render(PodEmptyScreen);

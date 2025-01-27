@@ -43,6 +43,7 @@ import { PodmanCleanupWindows } from './podman-cleanup-windows';
 import type { InstalledPodman } from './podman-cli';
 import { getPodmanCli, getPodmanInstallation } from './podman-cli';
 import * as podman5JSON from './podman5.json';
+import { getPowerShellClient } from './powershell';
 import { getAssetsFolder, normalizeWSLOutput } from './util';
 import { WslHelper } from './wsl-helper';
 
@@ -641,20 +642,38 @@ class WinMemoryCheck extends BaseCheck {
   }
 }
 
+async function isVirtualMachineAvailable(): Promise<boolean> {
+  const client = await getPowerShellClient();
+  return client.isVirtualMachineAvailable();
+}
+
+async function isUserAdmin(): Promise<boolean> {
+  const client = await getPowerShellClient();
+  return client.isUserAdmin();
+}
+
+async function isPodmanDesktopElevated(): Promise<boolean> {
+  const client = await getPowerShellClient();
+  return client.isRunningElevated();
+}
+
+async function isHyperVInstalled(): Promise<boolean> {
+  const client = await getPowerShellClient();
+  return client.isHyperVInstalled();
+}
+
+async function isHyperVRunning(): Promise<boolean> {
+  const client = await getPowerShellClient();
+  return client.isHyperVRunning();
+}
+
 export class VirtualMachinePlatformCheck extends BaseCheck {
   title = 'Virtual Machine Platform Enabled';
 
   async execute(): Promise<extensionApi.CheckResult> {
     try {
-      // set CurrentUICulture to force output in english
-      const { stdout: res } = await extensionApi.process.exec(
-        'powershell.exe',
-        [
-          '[System.Console]::OutputEncoding = [System.Text.Encoding]::Unicode; (Get-WmiObject -Query "Select * from Win32_OptionalFeature where InstallState = \'1\'").Name | select-string VirtualMachinePlatform',
-        ],
-        { encoding: 'utf16le' },
-      );
-      if (res.indexOf('VirtualMachinePlatform') >= 0) {
+      const result = await isVirtualMachineAvailable();
+      if (result) {
         return this.createSuccessfulResult();
       }
     } catch (err) {
@@ -671,20 +690,7 @@ export class VirtualMachinePlatformCheck extends BaseCheck {
   }
 }
 
-abstract class WindowsCheck extends BaseCheck {
-  async isUserAdmin(): Promise<boolean> {
-    try {
-      const { stdout: res } = await extensionApi.process.exec('powershell.exe', [
-        '$null -ne (whoami /groups /fo csv | ConvertFrom-Csv | Where-Object {$_.SID -eq "S-1-5-32-544"})',
-      ]);
-      return res.trim() === 'True';
-    } catch (err: unknown) {
-      return false;
-    }
-  }
-}
-
-export class WSL2Check extends WindowsCheck {
+export class WSL2Check extends BaseCheck {
   title = 'WSL2 Installed';
   installWSLCommandId = 'podman.onboarding.installWSL';
 
@@ -707,7 +713,7 @@ export class WSL2Check extends WindowsCheck {
 
   async execute(): Promise<extensionApi.CheckResult> {
     try {
-      const isAdmin = await this.isUserAdmin();
+      const isAdmin = await isUserAdmin();
       const isWSL = await this.isWSLPresent();
       const isRebootNeeded = await this.isRebootNeeded();
 
@@ -839,7 +845,7 @@ export class WSLVersionCheck extends BaseCheck {
   }
 }
 
-export class HyperVCheck extends WindowsCheck {
+export class HyperVCheck extends BaseCheck {
   title = 'Hyper-V installed';
   static readonly PODMAN_MINIMUM_VERSION_FOR_HYPERV = '5.2.0';
 
@@ -854,7 +860,7 @@ export class HyperVCheck extends WindowsCheck {
         description: `Hyper-V is only supported with podman version >= ${HyperVCheck.PODMAN_MINIMUM_VERSION_FOR_HYPERV}.`,
       });
     }
-    if (!(await this.isUserAdmin())) {
+    if (!(await isUserAdmin())) {
       return this.createFailureResult({
         description: 'You must have administrative rights to run Hyper-V Podman machines',
         docLinksDescription: 'Contact your Administrator to setup Hyper-V.',
@@ -864,12 +870,12 @@ export class HyperVCheck extends WindowsCheck {
         },
       });
     }
-    if (!(await this.isPodmanDesktopElevated())) {
+    if (!(await isPodmanDesktopElevated())) {
       return this.createFailureResult({
         description: 'You must run Podman Desktop with administrative rights to run Hyper-V Podman machines.',
       });
     }
-    if (!(await this.isHyperVinstalled())) {
+    if (!(await isHyperVInstalled())) {
       return this.createFailureResult({
         description: 'Hyper-V is not installed on your system.',
         docLinksDescription: 'call DISM /Online /Enable-Feature /All /FeatureName:Microsoft-Hyper-V in a terminal',
@@ -879,7 +885,7 @@ export class HyperVCheck extends WindowsCheck {
         },
       });
     }
-    if (!(await this.isHyperVRunning())) {
+    if (!(await isHyperVRunning())) {
       return this.createFailureResult({
         description: 'Hyper-V is not running on your system.',
         docLinksDescription: 'call sc start vmms in a terminal',
@@ -898,34 +904,5 @@ export class HyperVCheck extends WindowsCheck {
       return compareVersions(installedPodman?.version, HyperVCheck.PODMAN_MINIMUM_VERSION_FOR_HYPERV) >= 0;
     }
     return false;
-  }
-
-  private async isPodmanDesktopElevated(): Promise<boolean> {
-    try {
-      const { stdout: res } = await extensionApi.process.exec('powershell.exe', [
-        '(New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)',
-      ]);
-      return res.trim() === 'True';
-    } catch (err: unknown) {
-      return false;
-    }
-  }
-
-  private async isHyperVinstalled(): Promise<boolean> {
-    try {
-      await extensionApi.process.exec('powershell.exe', ['Get-Service vmms']);
-      return true;
-    } catch (err: unknown) {
-      return false;
-    }
-  }
-
-  private async isHyperVRunning(): Promise<boolean> {
-    try {
-      const result = await extensionApi.process.exec('powershell.exe', ['@(Get-Service vmms).Status']);
-      return result.stdout === 'Running';
-    } catch (err: unknown) {
-      return false;
-    }
   }
 }

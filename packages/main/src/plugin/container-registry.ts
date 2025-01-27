@@ -109,6 +109,9 @@ export class ContainerProviderRegistry {
   private readonly _onEvent = new Emitter<JSONEvent>();
   readonly onEvent: Event<JSONEvent> = this._onEvent.event;
 
+  private readonly _onApiAttached = new Emitter<string>();
+  readonly onApiAttached: Event<string> = this._onApiAttached.event;
+
   // delay in ms before retrying to connect to the provider when /events connection fails
   protected retryDelayEvents: number = 5000;
 
@@ -129,6 +132,7 @@ export class ContainerProviderRegistry {
 
   protected containerProviders: Map<string, containerDesktopAPI.ContainerProviderConnection> = new Map();
   protected internalProviders: Map<string, InternalContainerProvider> = new Map();
+  protected notify: boolean = true;
 
   // map of streams per container id
   protected streamsPerContainerId: Map<string, NodeJS.ReadWriteStream> = new Map();
@@ -147,6 +151,8 @@ export class ContainerProviderRegistry {
 
     eventEmitter.on('event', (jsonEvent: JSONEvent) => {
       nbEvents++;
+      // reconnected
+      this.notify = true;
       // do not log healthcheck(health_status) events
       // as it's too verbose/repeating a lot
       if (jsonEvent.status !== 'health_status') {
@@ -204,8 +210,11 @@ export class ContainerProviderRegistry {
 
     api.getEvents((err, stream) => {
       if (err) {
-        console.log('error is', err);
-        errorCallback(new Error('Error in handling events', err));
+        if (this.notify) {
+          console.log('error is', err);
+          errorCallback(new Error('Error in handling events', err));
+          this.notify = false;
+        }
       }
 
       stream?.on('error', error => {
@@ -300,6 +309,11 @@ export class ContainerProviderRegistry {
 
     this.handleEvents(internalProvider.api, errorHandler);
     this.apiSender.send('provider-change', {});
+    this._onApiAttached.fire(internalProvider.id);
+  }
+
+  isApiAttached(id: string): boolean {
+    return !!this.internalProviders.get(id)?.api;
   }
 
   registerContainerConnection(
@@ -367,6 +381,12 @@ export class ContainerProviderRegistry {
     });
   }
 
+  notifyConsole(message: string): void {
+    if (this.notify) {
+      console.log(message);
+    }
+  }
+
   // do not use inspect information
   async listSimpleContainers(abortController?: AbortController): Promise<SimpleContainerInfo[]> {
     let telemetryOptions = {};
@@ -391,7 +411,7 @@ export class ContainerProviderRegistry {
             }),
           );
         } catch (error) {
-          console.log('error in engine', provider.name, error);
+          this.notifyConsole(`error in engine ${provider.name} ${error}`);
           telemetryOptions = { error: error };
           return [];
         }
@@ -550,7 +570,7 @@ export class ContainerProviderRegistry {
             }),
           );
         } catch (error) {
-          console.log('error in engine', provider.name, error);
+          this.notifyConsole(`error in engine ${provider.name} ${error}`);
           telemetryOptions = { error: error };
           return [];
         }
@@ -589,7 +609,7 @@ export class ContainerProviderRegistry {
             return imageInfo;
           });
         } catch (error) {
-          console.log('error in engine', provider.name, error);
+          this.notifyConsole(`error in engine ${provider.name} ${error}`);
           telemetryOptions = { error: error };
           return [];
         }
@@ -712,7 +732,7 @@ export class ContainerProviderRegistry {
             return podInfo;
           });
         } catch (error) {
-          console.log('error in engine', provider.name, error);
+          this.notifyConsole(`error in engine ${provider.name} ${error}`);
           telemetryOptions = { error: error };
           return [];
         }
@@ -835,7 +855,7 @@ export class ContainerProviderRegistry {
           });
           return { Volumes: volumeInfos, Warnings: volumeListInfo.Warnings, engineName, engineId };
         } catch (error) {
-          console.log('error in engine', provider.name, error);
+          this.notifyConsole(`error in engine ${provider.name} ${error}`);
           telemetryOptions = { error: error };
           return [];
         }

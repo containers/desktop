@@ -17,6 +17,7 @@
  ***********************************************************************/
 
 import type { IconDefinition } from '@fortawesome/fontawesome-common-types';
+import type { Component } from 'svelte';
 import { type Writable, writable } from 'svelte/store';
 import type { IconSize } from 'svelte-fa';
 
@@ -34,7 +35,7 @@ export interface NavigationRegistryEntry {
   name: string;
   icon: {
     iconImage?: string | { readonly light: string; readonly dark: string };
-    iconComponent?: any;
+    iconComponent?: Component;
     faIcon?: { definition: IconDefinition; size: IconSize };
   };
   tooltip: string;
@@ -60,7 +61,7 @@ let hiddenItems: string[] = [];
 
 let values: NavigationRegistryEntry[] = [];
 let initialized = false;
-const init = () => {
+const init = (): void => {
   values.push(createNavigationContainerEntry());
   values.push(createNavigationPodEntry());
   values.push(createNavigationImageEntry());
@@ -71,7 +72,7 @@ const init = () => {
   hideItems().catch((err: unknown) => console.error('Error hiding navigation items', err));
 };
 
-function collecItem(navigationRegistryEntry: NavigationRegistryEntry, items: DisplayItem[]) {
+function collecItem(navigationRegistryEntry: NavigationRegistryEntry, items: DisplayItem[]): void {
   if (navigationRegistryEntry.items && navigationRegistryEntry.type === 'group') {
     navigationRegistryEntry.items.forEach(item => {
       collecItem(item, items);
@@ -117,7 +118,7 @@ export const fetchNavigationRegistries = async (): Promise<void> => {
   await navigationRegistryEventStoreInfo.fetch();
 };
 
-function hideSingleItem(navigationRegistryEntry: NavigationRegistryEntry) {
+function hideSingleItem(navigationRegistryEntry: NavigationRegistryEntry): void {
   if (hiddenItems?.includes(navigationRegistryEntry.name)) {
     navigationRegistryEntry.hidden = true;
   } else {

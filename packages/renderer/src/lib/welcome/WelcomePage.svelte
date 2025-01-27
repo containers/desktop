@@ -1,10 +1,10 @@
 <script lang="ts">
 import { Button, Checkbox, Link, Tooltip } from '@podman-desktop/ui-svelte';
-import { onDestroy, onMount } from 'svelte';
-import type { Unsubscriber } from 'svelte/store';
+import { onMount } from 'svelte';
 import { router } from 'tinro';
 
 import { onboardingList } from '/@/stores/onboarding';
+import { providerInfos } from '/@/stores/providers';
 import type { OnboardingInfo } from '/@api/onboarding';
 
 import IconImage from '../appearance/IconImage.svelte';
@@ -17,19 +17,36 @@ export let showTelemetry = false;
 
 let telemetry = true;
 
-// Global context related
-let contextsUnsubscribe: Unsubscriber;
-
-let onboardingsUnsubscribe: Unsubscriber;
 const welcomeUtils = new WelcomeUtils();
 let podmanDesktopVersion: string;
 
 // Extend ProviderInfo to have a selected property
-interface OnboardingInfoWithSelected extends OnboardingInfo {
+interface OnboardingInfoWithAdditionalInfo extends OnboardingInfo {
   selected?: boolean;
+  containerEngine?: boolean;
 }
 
-let onboardingProviders: OnboardingInfoWithSelected[] = [];
+let onboardingProviders: OnboardingInfoWithAdditionalInfo[] = [];
+
+// Get every provider that has a container connections
+$: providersWithContainerConnections = $providerInfos.filter(provider => provider.containerConnections.length > 0);
+
+// Using providerInfos as well as the information we have from onboarding,
+// we will by default auto-select as well as add containerEngine to the list as true/false
+// so we can make sure that extensions with container engines are listed first
+$: onboardingProviders = $onboardingList
+  .map(provider => {
+    // Check if it's in the list, if it is, then it has a container engine
+    const hasContainerConnection = providersWithContainerConnections.some(
+      connectionProvider => connectionProvider.extensionId === provider.extension,
+    );
+    return {
+      ...provider,
+      selected: true,
+      containerEngine: hasContainerConnection,
+    };
+  })
+  .sort((a, b) => Number(b.containerEngine) - Number(a.containerEngine)); // Sort by containerEngine (true first)
 
 onMount(async () => {
   const ver = await welcomeUtils.getVersion();
@@ -44,28 +61,9 @@ onMount(async () => {
     showTelemetry = true;
   }
   podmanDesktopVersion = await window.getPodmanDesktopVersion();
-
-  onboardingsUnsubscribe = onboardingList.subscribe(value => {
-    // Add "selected" property to each provider and add to onboardingEnabledProviders
-    onboardingProviders = value.map(provider => {
-      return {
-        ...provider,
-        selected: true,
-      };
-    });
-  });
 });
 
-onDestroy(() => {
-  if (onboardingsUnsubscribe) {
-    onboardingsUnsubscribe();
-  }
-  if (contextsUnsubscribe) {
-    contextsUnsubscribe();
-  }
-});
-
-async function closeWelcome() {
+async function closeWelcome(): Promise<void> {
   showWelcome = false;
   if (showTelemetry) {
     await welcomeUtils.setTelemetry(telemetry);
@@ -73,7 +71,7 @@ async function closeWelcome() {
 }
 
 // Function to toggle provider selection
-function toggleOnboardingSelection(providerName: string) {
+function toggleOnboardingSelection(providerName: string): void {
   // Go through providers, find the provider name and toggle the selected value
   // then update providers
   onboardingProviders = onboardingProviders.map(provider => {
@@ -84,7 +82,7 @@ function toggleOnboardingSelection(providerName: string) {
   });
 }
 
-function startOnboardingQueue() {
+function startOnboardingQueue(): void {
   const selectedProviders = onboardingProviders.filter(provider => provider.selected);
   const extensionIds = selectedProviders.map(provider => provider.extension);
   const queryParams = new URLSearchParams({ ids: extensionIds.join(',') }).toString();
@@ -111,7 +109,7 @@ function startOnboardingQueue() {
         <div class="bg-[var(--pd-content-card-inset-bg)] px-4 pb-4 pt-2 rounded">
           {#if onboardingProviders && onboardingProviders.length > 0}
             <div class="flex justify-center text-sm text-[var(--pd-content-card-text)] pb-2">
-              <div>Click below to start the onboarding for the following extensions:</div>
+              <div>Choose the extensions to include:</div>
             </div>
             <div aria-label="providerList" class="grid grid-cols-3 gap-3">
               {#each onboardingProviders as onboarding}
@@ -135,7 +133,7 @@ function startOnboardingQueue() {
                     title="{onboarding.displayName} checkbox"
                     name="{onboarding.displayName} checkbox"
                     bind:checked={onboarding.selected}
-                    on:click={() => toggleOnboardingSelection(onboarding.name)}
+                    on:click={(): void => toggleOnboardingSelection(onboarding.name)}
                     class="text-xl" />
                 </div>
               {/each}
@@ -144,12 +142,7 @@ function startOnboardingQueue() {
         </div>
       </div>
       <div class="flex justify-center p-2 text-sm items-center">
-        Configure these and more under <Link
-          on:click={async () => {
-            await closeWelcome();
-            router.goto('/preferences');
-          }}>Settings</Link
-        >.
+        Configure these and more under Settings.
       </div>
     </div>
 
@@ -166,18 +159,14 @@ function startOnboardingQueue() {
           <div class="w-2/5 text-[var(--pd-content-card-text)]">
             Help Red Hat improve Podman Desktop by allowing anonymous usage data to be collected.
             <Link
-              on:click={async () => {
+              on:click={async (): Promise<void> => {
                 await window.openExternal('https://developers.redhat.com/article/tool-data-collection');
               }}>Read our privacy statement</Link>
           </div>
         </div>
         <div class="flex justify-center p-1 text-sm text-[var(--pd-content-card-text)]">
           <div>
-            You can always modify this preference later in <Link
-              on:click={async () => {
-                await closeWelcome();
-                router.goto('/preferences/default/preferences.telemetry');
-              }}>Settings &gt; Preferences</Link>
+            You can always modify this preference later in Settings &gt; Preferences
           </div>
         </div>
       </div>
@@ -186,27 +175,23 @@ function startOnboardingQueue() {
     <!-- Footer - button bar -->
     <div class="flex justify-end flex-none bg-[var(--pd-content-bg)] p-8">
       <div class="flex flex-row">
-        <!-- If Providers have any onboarding elements selected, create a button that says "Start onboarding" rather than Go to Podman Desktop -->
+        <!-- If Providers have any onboarding elements selected, create a button that says "Start onboarding" rather than Skip -->
         {#if onboardingProviders && onboardingProviders.filter(o => o.selected).length > 0}
-          <!-- We will "always" show the "Go to Podman Desktop" button
+          <!-- We will "always" show the "Skip" button
           in-case anything were to happen with the Start onboarding button / sequence not working correctly.
           we do not want the user to not be able to continue. -->
           <Button
             type="secondary"
-            on:click={async () => {
-              await closeWelcome();
-            }}>Go to Podman Desktop</Button>
+            on:click={closeWelcome}>Skip</Button>
           <Button
             class="ml-2"
-            on:click={async () => {
+            on:click={async (): Promise<void> => {
               await closeWelcome();
               startOnboardingQueue();
             }}>Start onboarding</Button>
         {:else}
           <Button
-            on:click={async () => {
-              await closeWelcome();
-            }}>Go to Podman Desktop</Button>
+            on:click={closeWelcome}>Skip</Button>
         {/if}
       </div>
     </div>

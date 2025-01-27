@@ -1,5 +1,5 @@
 /**********************************************************************
- * Copyright (C) 2023 Red Hat, Inc.
+ * Copyright (C) 2023-2025 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,14 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as path from 'node:path';
 
+import type { AnalyzedExtension } from '/@/plugin/extension/extension-analyzer.js';
 import type { Onboarding, OnboardingInfo, OnboardingStatus } from '/@api/onboarding.js';
 
 import { getBase64Image } from '../util.js';
 import type { Context } from './context/context.js';
-import type { AnalyzedExtension } from './extension-loader.js';
 import { Disposable } from './types/disposable.js';
 
 export class OnboardingRegistry {

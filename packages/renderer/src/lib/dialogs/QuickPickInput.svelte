@@ -26,8 +26,10 @@ let onSelectCallbackEnabled = false;
 let display = false;
 let mode: 'InputBox' | 'QuickPick';
 
-let quickPickItems: { value: any; description: string; detail: string; checkbox: boolean }[] = [];
-let quickPickFilteredItems: { value: any; description: string; detail: string; checkbox: boolean }[] = quickPickItems;
+type QuickPickItem = { value: string; description: string; detail: string; checkbox: boolean };
+
+let quickPickItems: QuickPickItem[] = [];
+let quickPickFilteredItems: QuickPickItem[] = quickPickItems;
 let quickPickSelectedIndex = 0;
 let quickPickSelectedFilteredIndex = 0;
 let quickPickCanPickMany = false;
@@ -35,7 +37,7 @@ let quickPickCanPickMany = false;
 let inputElement: HTMLInputElement | HTMLTextAreaElement | undefined = undefined;
 let outerDiv: HTMLDivElement | undefined = undefined;
 
-const showInputCallback = (inputCallpackParameter: unknown) => {
+const showInputCallback = (inputCallpackParameter: unknown): void => {
   const options: InputBoxOptions | undefined = inputCallpackParameter as InputBoxOptions;
   mode = 'InputBox';
   inputValue = options?.value;
@@ -67,7 +69,7 @@ const showInputCallback = (inputCallpackParameter: unknown) => {
     });
 };
 
-const showQuickPickCallback = (quickpickParameter: unknown) => {
+const showQuickPickCallback = (quickpickParameter: unknown): void => {
   const options: QuickPickOptions | undefined = quickpickParameter as QuickPickOptions;
   mode = 'QuickPick';
   placeHolder = options?.placeHolder;
@@ -128,7 +130,7 @@ onMount(() => {
   window.events?.receive('showQuickPick:add', showQuickPickCallback);
 });
 
-const onClose = async () => {
+const onClose = async (): Promise<void> => {
   if (validationError) {
     return;
   }
@@ -140,7 +142,8 @@ const onClose = async () => {
   cleanup();
 };
 
-async function onInputChange(event: any) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function onInputChange(event: any): Promise<void> {
   // in case of quick pick, filter the items
   if (mode === 'QuickPick') {
     let val = event.target.value.toLowerCase();
@@ -173,7 +176,7 @@ onDestroy(() => {
   cleanup();
 });
 
-function cleanup() {
+function cleanup(): void {
   display = false;
   inputValue = '';
   placeHolder = '';
@@ -186,7 +189,7 @@ function cleanup() {
   ignoreFocusOut = false;
 }
 
-async function validateQuickPick() {
+async function validateQuickPick(): Promise<void> {
   if (mode === 'InputBox') {
     // needs to convert the index from the filtered index to the original index
     const originalIndex = quickPickItems.indexOf(quickPickFilteredItems[quickPickSelectedIndex]);
@@ -209,7 +212,7 @@ async function validateQuickPick() {
   cleanup();
 }
 
-async function clickQuickPickItem(item: any, index: number) {
+async function clickQuickPickItem(item: QuickPickItem, index: number): Promise<void> {
   if (quickPickCanPickMany) {
     // reset index as we clicked
     quickPickSelectedFilteredIndex = -1;
@@ -223,7 +226,7 @@ async function clickQuickPickItem(item: any, index: number) {
   }
 }
 
-async function handleKeydown(e: KeyboardEvent) {
+async function handleKeydown(e: KeyboardEvent): Promise<void> {
   if (!display) {
     return;
   }
@@ -302,7 +305,7 @@ async function handleKeydown(e: KeyboardEvent) {
           {#if multiline}
             <textarea
               bind:this={inputElement}
-              on:input={event => onInputChange(event)}
+              on:input={onInputChange}
               bind:value={inputValue}
               class="px-1 w-full h-20 text-[var(--pd-input-select-hover-text)] border {validationError
                 ? 'border-[var(--pd-input-field-stroke-error)]'
@@ -311,7 +314,7 @@ async function handleKeydown(e: KeyboardEvent) {
           {:else}
             <input
               bind:this={inputElement}
-              on:input={event => onInputChange(event)}
+              on:input={onInputChange}
               type="text"
               bind:value={inputValue}
               class="px-1 w-full text-[var(--pd-input-select-hover-text)] border {validationError
@@ -347,7 +350,7 @@ async function handleKeydown(e: KeyboardEvent) {
               {/if}
               <button
                 title="Select {item.value}"
-                on:click={async () => await clickQuickPickItem(item, i)}
+                on:click={async (): Promise<void> => await clickQuickPickItem(item, i)}
                 class="text-[var(--pd-modal-dropdown-text)] text-left relative my-1 w-full px-1">
                 <div class="flex flex-col w-full">
                   <!-- first row is Value + optional description-->

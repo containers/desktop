@@ -44,7 +44,7 @@ vi.mock('@xterm/xterm', () => {
 beforeAll(() => {
   (window.events as unknown) = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    receive: (_channel: string, func: any) => {
+    receive: (_channel: string, func: any): void => {
       func();
     },
   };
@@ -78,7 +78,7 @@ async function waitRender(): Promise<void> {
 }
 
 // the build image page expects to have a valid provider connection, so let's mock one
-function setup() {
+function setup(): void {
   const pStatus: ProviderStatus = 'started';
   const pInfo: ProviderContainerConnectionInfo = {
     name: 'test',
@@ -265,6 +265,33 @@ test('Select multiple platforms without image name should disable Build button',
   const platform2 = screen.getByRole('checkbox', { name: 'ARM® aarch64 systems' });
   expect(platform2).toBeInTheDocument();
   expect(platform2).toBeChecked();
+
+  const buildButton = screen.getByRole('button', { name: 'Build' });
+  expect(buildButton).toBeInTheDocument();
+  expect(buildButton).toBeDisabled();
+});
+
+test('Selecting no platforms should disable Build button', async () => {
+  // Auto select amd64
+  vi.mocked(window.getOsArch).mockResolvedValue('amd64');
+  setup();
+  await waitRender();
+
+  const containerFilePath = screen.getByRole('textbox', { name: 'Containerfile path' });
+  expect(containerFilePath).toBeInTheDocument();
+  await userEvent.type(containerFilePath, '/somepath/containerfile');
+
+  // Wait until 'linux/arm64' checkboxes exist and are enabled
+  await waitFor(() => {
+    const linuxAmd64Button = screen.getByRole('checkbox', { name: 'Intel and AMD x86_64 systems' });
+    expect(linuxAmd64Button).toBeInTheDocument();
+    expect(linuxAmd64Button).toBeChecked();
+  });
+
+  // disable the platform
+  const linuxAmd64Button = screen.getByRole('button', { name: 'linux/amd64' });
+  expect(linuxAmd64Button).toBeInTheDocument();
+  await userEvent.click(linuxAmd64Button);
 
   const buildButton = screen.getByRole('button', { name: 'Build' });
   expect(buildButton).toBeInTheDocument();

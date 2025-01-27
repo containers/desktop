@@ -33,7 +33,7 @@ $: selectedProviderConnection = providerConnections.length > 0 ? providerConnect
 let selectedProvider: ProviderContainerConnectionInfo | undefined = undefined;
 $: selectedProvider = !selectedProvider && selectedProviderConnection ? selectedProviderConnection : selectedProvider;
 
-async function createPodFromContainers() {
+async function createPodFromContainers(): Promise<void> {
   createInProgress = true;
   try {
     await doCreatePodFromContainers();
@@ -42,7 +42,7 @@ async function createPodFromContainers() {
   }
   createInProgress = false;
 }
-async function doCreatePodFromContainers() {
+async function doCreatePodFromContainers(): Promise<void> {
   if (!selectedProvider) {
     throw new Error('no provider selected');
   }
@@ -54,6 +54,7 @@ async function doCreatePodFromContainers() {
 
       // convert port bindings to an port mapping object
       return Object.entries(containerInspect.HostConfig.PortBindings).map(([key, value]) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const valueAny: any = value;
         const container_port = parseInt(key.split('/')[0]);
         // we may not have any value
@@ -183,7 +184,7 @@ onDestroy(() => {
   podCreationHolder.set(undefined);
 });
 
-function updatePortExposure(port: number, checked: boolean) {
+function updatePortExposure(port: number, checked: boolean): void {
   const val = mapPortExposed.get(port);
   if (val) {
     mapPortExposed.set(port, {
@@ -267,7 +268,7 @@ function navigateToContainers(): void {
                 <Checkbox
                   class="pt-0.5 mr-5"
                   bind:checked={value.exposed}
-                  on:click={event => updatePortExposure(port, event.detail)} />
+                  on:click={(event): void => updatePortExposure(port, event.detail)} />
                 <div class="w-28 mr-5">Port {port.toString()}</div>
                 <span>{value.container}</span>
               </div>
@@ -301,9 +302,7 @@ function navigateToContainers(): void {
           <Button
             icon={SolidPodIcon}
             bind:disabled={createInProgress}
-            on:click={async () => {
-              await createPodFromContainers();
-            }}
+            on:click={createPodFromContainers}
             bind:inProgress={createInProgress}
             aria-label="Create pod">
             Create Pod

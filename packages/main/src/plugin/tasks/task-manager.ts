@@ -68,6 +68,9 @@ export class TaskManager {
             description: 'Show running tasks in the status bar',
             type: 'boolean',
             default: false,
+            experimental: {
+              githubDiscussionLink: 'https://github.com/podman-desktop/podman-desktop/discussions/10777',
+            },
           },
           [`${ExperimentalTasksSettings.SectionName}.${ExperimentalTasksSettings.Toast}`]: {
             description: 'Display a notification toast when task is created',
@@ -78,6 +81,9 @@ export class TaskManager {
             description: 'Replace the current task manager widget by the new one',
             type: 'boolean',
             default: false,
+            experimental: {
+              githubDiscussionLink: 'https://github.com/podman-desktop/podman-desktop/discussions/10533',
+            },
           },
         },
       },

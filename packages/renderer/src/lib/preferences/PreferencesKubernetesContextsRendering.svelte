@@ -53,7 +53,7 @@ onMount(async () => {
   }
 });
 
-async function handleSetContext(contextName: string) {
+async function handleSetContext(contextName: string): Promise<void> {
   $kubernetesContexts = clearKubeUIContextErrors($kubernetesContexts);
   try {
     await window.kubernetesSetContext(contextName);
@@ -64,7 +64,7 @@ async function handleSetContext(contextName: string) {
   }
 }
 
-async function handleDeleteContext(contextName: string) {
+async function handleDeleteContext(contextName: string): Promise<void> {
   if (currentContextName === contextName) {
     const result = await window.showMessageBox({
       title: 'Delete Context',
@@ -110,6 +110,16 @@ function isContextBeingChecked(contextName: string, experimental: boolean): bool
   }
   return !!$kubernetesContextsCheckingStateDelayed?.get(contextName);
 }
+
+async function connect(contextName: string): Promise<void> {
+  await window.telemetryTrack('kubernetes.monitoring.start.non-current');
+  $kubernetesContexts = clearKubeUIContextErrors($kubernetesContexts, contextName);
+  window.kubernetesRefreshContextState(contextName).catch((e: unknown) => {
+    if (e instanceof Error) {
+      $kubernetesContexts = setKubeUIContextError($kubernetesContexts, contextName, e);
+    }
+  });
+}
 </script>
 
 <SettingsPage title="Kubernetes Contexts">
@@ -123,7 +133,7 @@ function isContextBeingChecked(contextName: string, experimental: boolean): bool
       hidden={$kubernetesContexts.length > 0}>
       <Button
         class="py-3"
-        on:click={() => {
+        on:click={(): void => {
           router.goto('/preferences/resources');
         }}>
         Go to Resources
@@ -162,9 +172,9 @@ function isContextBeingChecked(contextName: string, experimental: boolean): bool
               <ListItemButtonIcon
                 title="Set as Current Context"
                 icon={faRightToBracket}
-                onClick={() => handleSetContext(context.name)}></ListItemButtonIcon>
+                onClick={(): Promise<void> => handleSetContext(context.name)}></ListItemButtonIcon>
             {/if}
-            <ListItemButtonIcon title="Delete Context" icon={faTrash} onClick={() => handleDeleteContext(context.name)}
+            <ListItemButtonIcon title="Delete Context" icon={faTrash} onClick={(): Promise<void> => handleDeleteContext(context.name)}
             ></ListItemButtonIcon>
           </div>
           {#if context.error}
@@ -200,17 +210,22 @@ function isContextBeingChecked(contextName: string, experimental: boolean): bool
                   </div>
                 </div>
               {:else}
-                <div class="flex flex-row pt-2">
-                  <div class="w-3 h-3 rounded-full bg-[var(--pd-status-disconnected)]"></div>
-                  <div class="ml-1 text-xs text-[var(--pd-status-disconnected)]" aria-label="Context Unreachable">
-                    {#if context.isKnown}
-                      UNREACHABLE
-                    {:else}
-                      UNKNOWN
-                    {/if}
+                <div class="flex flex-col space-y-2">
+                  <div class="flex flex-row pt-2">
+                    <div class="w-3 h-3 rounded-full bg-[var(--pd-status-disconnected)]"></div>
+                    <div class="ml-1 text-xs text-[var(--pd-status-disconnected)]" aria-label="Context Unreachable">
+                      {#if context.isKnown}
+                        UNREACHABLE
+                      {:else}
+                        UNKNOWN
+                      {/if}
+                    </div>
+                    {#if context.isBeingChecked}
+                      <div class="ml-1"><Spinner size="12px"></Spinner></div>
+                    {/if}                    
                   </div>
-                  {#if context.isBeingChecked}
-                    <div class="ml-1"><Spinner size="12px"></Spinner></div>
+                  {#if !$kubernetesContextsState.get(context.name)}
+                    <div><Button on:click={(): Promise<void> => connect(context.name)}>Connect</Button></div>
                   {/if}
                 </div>
               {/if}

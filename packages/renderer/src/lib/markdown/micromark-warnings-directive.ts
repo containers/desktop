@@ -16,6 +16,9 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
+import type { Directive } from 'micromark-extension-directive';
 import type { CompileContext } from 'micromark-util-types';
 
 import { createUIButton } from './component/micromark-button';
@@ -32,14 +35,14 @@ const characterReferences = new Map([
   ['&gt;', '>'],
 ]);
 
-export function decode(value: string) {
+export function decode(value: string): string {
   return value.replace(/(&quot;|&amp;|&gt;|&lt;)/g, replace);
 
   /**
    * @param {string} value
    * @returns {string}
    */
-  function replace(value: string) {
+  function replace(value: string): string {
     return characterReferences.get(value) ?? '';
   }
 }
@@ -48,7 +51,7 @@ export function decode(value: string) {
  * Allow to generate a link markdown directive that executes a command
  * syntax is the following:
  * :warnings[[{item}, {item}]]
- * where item is 
+ * where item is
  * {
     state: string;
     description: string;
@@ -67,7 +70,7 @@ export function decode(value: string) {
 /**
  * @type {import('micromark-extension-directive').Handle}
  */
-export function warnings(this: CompileContext, d: any) {
+export function warnings(this: CompileContext, d: Directive): boolean {
   // Make sure it's not part of a text directive
   if (d.type !== 'textDirective') {
     return false;

@@ -20,7 +20,7 @@ import '@testing-library/jest-dom/vitest';
 
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { ImageInfoUI } from '/@/lib/image/ImageInfoUI';
 
@@ -44,13 +44,15 @@ const imageInfo: ImageInfoUI = {
   labels: {},
   icon: undefined,
 };
-const closeCallback = () => {};
+const closeCallback = (): void => {};
+
+beforeAll(() => {
+  Object.defineProperty(window, 'tagImage', { value: vi.fn() });
+  Object.defineProperty(window, 'deleteImage', { value: vi.fn() });
+});
 
 beforeEach(() => {
   vi.resetAllMocks();
-
-  (window as any).tagImage = vi.fn();
-  (window as any).deleteImage = vi.fn();
 });
 
 describe('RenameImageModel', () => {

@@ -37,7 +37,7 @@ beforeAll(() => {
   (window as any).getConfigurationValue = vi.fn().mockResolvedValue(undefined);
 });
 
-async function awaitRender(record: IConfigurationPropertyRecordedSchema, customProperties: any) {
+async function awaitRender(record: IConfigurationPropertyRecordedSchema, customProperties: any): Promise<void> {
   render(PreferencesRenderingItemFormat, {
     record,
     initialValue: getInitialValue(record),
@@ -415,4 +415,46 @@ test('Expect value is updated from an external change', async () => {
 
   // initial value should be 5
   await vi.waitFor(() => expect(inputField.value).toBe('5'));
+});
+
+test('Expect boolean record to be updated from checked to not checked', async () => {
+  const RECORD_ID = 'boolean-record-id';
+  const BOOLEAN_RECORD: IConfigurationPropertyRecordedSchema = {
+    id: RECORD_ID,
+    title: 'Hello',
+    parentId: 'parent.record',
+    description: 'boolean-record-description',
+    type: 'boolean',
+    scope: 'DEFAULT',
+    default: true,
+  };
+
+  // getConfigurationValue to return true
+  vi.mocked(window.getConfigurationValue).mockResolvedValue(true);
+
+  // render
+  await awaitRender(BOOLEAN_RECORD, {});
+  const checkbox = screen.getByRole('checkbox', { name: BOOLEAN_RECORD.description });
+
+  // ensure the checkbox is checked
+  await vi.waitFor(() => {
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).toBeChecked();
+  });
+
+  // getConfigurationValue to return false
+  vi.mocked(window.getConfigurationValue).mockResolvedValue(false);
+
+  // now update the configuration value
+  onDidChangeConfiguration.dispatchEvent(
+    new CustomEvent(RECORD_ID, {
+      detail: {
+        key: 'record',
+        value: false,
+      },
+    }),
+  );
+
+  // checkbox should not be checked anymore
+  await vi.waitFor(() => expect(checkbox).not.toBeChecked());
 });

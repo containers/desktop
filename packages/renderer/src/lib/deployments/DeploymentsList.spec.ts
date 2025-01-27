@@ -16,47 +16,29 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import '@testing-library/jest-dom/vitest';
 
-import type { V1Deployment } from '@kubernetes/client-node';
+import type { KubernetesObject, V1Deployment } from '@kubernetes/client-node';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-/* eslint-disable import/no-duplicates */
-import { tick } from 'svelte';
-import { get } from 'svelte/store';
-/* eslint-enable import/no-duplicates */
-import { beforeAll, beforeEach, expect, test, vi } from 'vitest';
+import { writable } from 'svelte/store';
+import { beforeEach, expect, test, vi } from 'vitest';
 
-import { kubernetesCurrentContextDeployments } from '/@/stores/kubernetes-contexts-state';
+import * as states from '/@/stores/kubernetes-contexts-state';
 
 import DeploymentsList from './DeploymentsList.svelte';
 
-const kubernetesRegisterGetCurrentContextResourcesMock = vi.fn();
-
-beforeAll(() => {
-  (window as any).kubernetesRegisterGetCurrentContextResources = kubernetesRegisterGetCurrentContextResourcesMock;
-});
+vi.mock('/@/stores/kubernetes-contexts-state');
 
 beforeEach(() => {
   vi.resetAllMocks();
   vi.clearAllMocks();
-  (window as any).kubernetesGetContextsGeneralState = () => Promise.resolve(new Map());
-  (window as any).kubernetesGetCurrentContextGeneralState = () => Promise.resolve({});
-  (window as any).window.kubernetesUnregisterGetCurrentContextResources = () => Promise.resolve(undefined);
-  (window as any).getConfigurationValue = vi.fn();
-  vi.mocked(window.getConfigurationValue).mockResolvedValue(false);
-  (window as any).kubernetesDeleteDeployment = vi.fn();
-  vi.mocked(window.kubernetesDeleteDeployment);
+  vi.mocked(states).deploymentSearchPattern = writable<string>('');
+  vi.mocked(states).kubernetesContextsCheckingStateDelayed = writable();
+  vi.mocked(states).kubernetesCurrentContextState = writable();
 });
 
-async function waitRender(customProperties: object): Promise<void> {
-  render(DeploymentsList, { ...customProperties });
-  await tick();
-}
-
 test('Expect deployment empty screen', async () => {
-  kubernetesRegisterGetCurrentContextResourcesMock.mockResolvedValue([]);
+  vi.mocked(states).kubernetesCurrentContextDeploymentsFiltered = writable<KubernetesObject[]>([]);
   render(DeploymentsList);
   const noDeployments = screen.getByRole('heading', { name: 'No deployments' });
   expect(noDeployments).toBeInTheDocument();
@@ -76,15 +58,9 @@ test('Expect deployments list', async () => {
       template: {},
     },
   };
-  kubernetesRegisterGetCurrentContextResourcesMock.mockResolvedValue([deployment]);
+  vi.mocked(states).kubernetesCurrentContextDeploymentsFiltered = writable<KubernetesObject[]>([deployment]);
 
-  // wait while store is populated
-  while (get(kubernetesCurrentContextDeployments).length === 0) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-
-  await waitRender({});
-
+  render(DeploymentsList);
   const deploymentName = screen.getByRole('cell', { name: 'my-deployment test-namespace' });
   expect(deploymentName).toBeInTheDocument();
 });
@@ -103,15 +79,9 @@ test('Expect correct column overflow', async () => {
       template: {},
     },
   };
-  kubernetesRegisterGetCurrentContextResourcesMock.mockResolvedValue([deployment]);
+  vi.mocked(states).kubernetesCurrentContextDeploymentsFiltered = writable<KubernetesObject[]>([deployment]);
 
-  // wait while store is populated
-  while (get(kubernetesCurrentContextDeployments).length === 0) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-
-  await waitRender({});
-
+  render(DeploymentsList);
   const rows = await screen.findAllByRole('row');
   expect(rows).toBeDefined();
   expect(rows.length).toBe(2);
@@ -129,35 +99,14 @@ test('Expect correct column overflow', async () => {
 });
 
 test('Expect filter empty screen', async () => {
-  const deployment: V1Deployment = {
-    apiVersion: 'apps/v1',
-    kind: 'Deployment',
-    metadata: {
-      name: 'my-deployment',
-      namespace: 'test-namespace',
-    },
-    spec: {
-      replicas: 2,
-      selector: {},
-      template: {},
-    },
-  };
+  vi.mocked(states).kubernetesCurrentContextDeploymentsFiltered = writable<KubernetesObject[]>([]);
 
-  kubernetesRegisterGetCurrentContextResourcesMock.mockResolvedValue([deployment]);
-
-  // wait while store is populated
-  while (get(kubernetesCurrentContextDeployments).length === 0) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-
-  await waitRender({ searchTerm: 'No match' });
-
+  render(DeploymentsList, { searchTerm: 'No match' });
   const filterButton = screen.getByRole('button', { name: 'Clear filter' });
   expect(filterButton).toBeInTheDocument();
 });
 
 test('Expect user confirmation to pop up when preferences require', async () => {
-  await vi.waitFor(() => get(kubernetesCurrentContextDeployments).length === 0);
   const deployment: V1Deployment = {
     apiVersion: 'apps/v1',
     kind: 'Deployment',
@@ -171,18 +120,15 @@ test('Expect user confirmation to pop up when preferences require', async () => 
       template: {},
     },
   };
-  kubernetesRegisterGetCurrentContextResourcesMock.mockResolvedValue([deployment]);
+  vi.mocked(states).kubernetesCurrentContextDeploymentsFiltered = writable<KubernetesObject[]>([deployment]);
 
-  await vi.waitFor(() => get(kubernetesCurrentContextDeployments).length > 0);
-
-  await waitRender({});
+  render(DeploymentsList);
 
   const checkboxes = screen.getAllByRole('checkbox', { name: 'Toggle deployment' });
   await fireEvent.click(checkboxes[0]);
 
   vi.mocked(window.getConfigurationValue).mockResolvedValue(true);
 
-  (window as any).showMessageBox = vi.fn();
   vi.mocked(window.showMessageBox).mockResolvedValue({ response: 1 });
 
   const deleteButton = screen.getByRole('button', { name: 'Delete 1 selected items' });
@@ -194,4 +140,49 @@ test('Expect user confirmation to pop up when preferences require', async () => 
   await fireEvent.click(deleteButton);
   expect(window.showMessageBox).toHaveBeenCalledTimes(2);
   await vi.waitFor(() => expect(window.kubernetesDeleteDeployment).toHaveBeenCalled());
+});
+
+test('deployemnts list is updated when kubernetesCurrentContextDeploymentsFiltered changes', async () => {
+  const deployment1: V1Deployment = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: {
+      name: 'my-deployment-1',
+      namespace: 'test-namespace',
+    },
+    spec: {
+      replicas: 2,
+      selector: {},
+      template: {},
+    },
+  };
+  const deployment2: V1Deployment = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: {
+      name: 'my-deployment-2',
+      namespace: 'test-namespace',
+    },
+    spec: {
+      replicas: 2,
+      selector: {},
+      template: {},
+    },
+  };
+  const filtered = writable<KubernetesObject[]>([deployment1, deployment2]);
+  vi.mocked(states).kubernetesCurrentContextDeploymentsFiltered = filtered;
+
+  const component = render(DeploymentsList);
+  const deploymentName1 = screen.getByRole('cell', { name: 'my-deployment-1 test-namespace' });
+  expect(deploymentName1).toBeInTheDocument();
+  const deploymentName2 = screen.getByRole('cell', { name: 'my-deployment-2 test-namespace' });
+  expect(deploymentName2).toBeInTheDocument();
+
+  filtered.set([deployment2]);
+  await component.rerender({});
+
+  const deploymentName1after = screen.queryByRole('cell', { name: 'my-deployment-1 test-namespace' });
+  expect(deploymentName1after).not.toBeInTheDocument();
+  const deploymentName2after = screen.getByRole('cell', { name: 'my-deployment-2 test-namespace' });
+  expect(deploymentName2after).toBeInTheDocument();
 });

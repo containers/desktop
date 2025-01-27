@@ -26,12 +26,12 @@ import ContributionActions from '/@/lib/actions/ContributionActions.svelte';
 const executeCommand = vi.fn();
 
 beforeAll(() => {
-  (window as any).executeCommand = executeCommand;
+  Object.defineProperty(window, 'executeCommand', { value: executeCommand });
   executeCommand.mockImplementation(() => {});
 
   (window.events as unknown) = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    receive: (_channel: string, func: any) => {
+    receive: (_channel: string, func: any): void => {
       func();
     },
   };
@@ -119,7 +119,7 @@ test('Expect executeCommand to be called with sanitize object', async () => {
   render(ContributionActions, {
     args: [
       {
-        nonSerializable: () => {},
+        nonSerializable: (): void => {},
         serializable: 'hello',
       },
     ],
@@ -143,7 +143,7 @@ test('Expect executeCommand to be called with sanitize object nested', async () 
     args: [
       {
         parent: {
-          nonSerializable: () => {},
+          nonSerializable: (): void => {},
           serializable: 'hello',
         },
       },

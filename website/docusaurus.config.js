@@ -105,6 +105,18 @@ const config = {
             from: '/docs/onboarding-for-kubernetes',
           },
           {
+            to: '/docs/kind/pushing-an-image-to-kind',
+            from: '/docs/kubernetes/kind/pushing-an-image-to-kind',
+          },
+          {
+            to: '/docs/minikube/pushing-an-image-to-minikube',
+            from: '/docs/kubernetes/minikube/pushing-an-image-to-minikube',
+          },
+          {
+            to: '/docs/lima/pushing-an-image-to-lima',
+            from: '/docs/kubernetes/lima/pushing-an-image-to-lima',
+          },
+          {
             to: '/docs/kubernetes/deploying-a-pod-to-kubernetes',
             from: '/docs/kubernetes/deploying-a-container-to-kubernetes',
           },

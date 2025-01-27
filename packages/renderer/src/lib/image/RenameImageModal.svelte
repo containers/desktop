@@ -27,8 +27,8 @@ function disableSave(name: string, tag: string): boolean {
 }
 
 let imageNameErrorMessage = '';
-function validateImageName(event: any): void {
-  let inputName = event.target.value;
+function validateImageName(event: Event): void {
+  let inputName = event.target instanceof Input ? event.target.value : undefined;
   if (inputName === undefined || inputName.trim() === '') {
     imageNameErrorMessage = 'Please enter a value';
   } else {
@@ -37,8 +37,8 @@ function validateImageName(event: any): void {
 }
 
 let imageTagErrorMessage = '';
-function validateImageTag(event: any): void {
-  let inputName = event.target.value;
+function validateImageTag(event: Event): void {
+  let inputName = event.target instanceof Input ? event.target.value : undefined;
   if (inputName === undefined || inputName.trim() === '') {
     imageTagErrorMessage = 'Please enter a value';
   } else {
@@ -46,7 +46,7 @@ function validateImageTag(event: any): void {
   }
 }
 
-async function renameImage(imageName: string, imageTag: string) {
+async function renameImage(imageName: string, imageTag: string): Promise<void> {
   let currentImageNameTag: string;
   let shouldDelete: boolean;
   if (imageInfoToRename.name === '<none>') {
@@ -63,8 +63,9 @@ async function renameImage(imageName: string, imageTag: string) {
       await window.deleteImage(imageInfoToRename.engineId, currentImageNameTag);
     }
     closeCallback();
-  } catch (error: any) {
-    imageNameErrorMessage = error.message;
+  } catch (error: unknown) {
+    imageNameErrorMessage =
+      error && typeof error === 'object' && 'message' in error && error.message ? String(error.message) : String(error);
   }
 
   if (detailed) {
@@ -75,9 +76,7 @@ async function renameImage(imageName: string, imageTag: string) {
 
 <Dialog
   title="Edit Image"
-  on:close={() => {
-    closeCallback();
-  }}>
+  on:close={closeCallback}>
   <div slot="content" class="w-full">
     <label for="imageName" class="block my-2 text-sm font-bold text-[var(--pd-modal-text)]">Image Name</label>
     <Input
@@ -85,7 +84,7 @@ async function renameImage(imageName: string, imageTag: string) {
       name="imageName"
       id="imageName"
       placeholder="Enter image name (e.g. quay.io/namespace/my-image-name)"
-      on:input={event => validateImageName(event)}
+      on:input={validateImageName}
       aria-invalid={imageNameErrorMessage !== ''}
       aria-label="imageName"
       required />
@@ -99,7 +98,7 @@ async function renameImage(imageName: string, imageTag: string) {
       name="imageTag"
       id="imageTag"
       placeholder="Enter image tag (e.g. latest)"
-      on:input={event => validateImageTag(event)}
+      on:input={validateImageTag}
       aria-invalid={imageTagErrorMessage !== ''}
       aria-label="imageTag"
       required />
@@ -111,13 +110,11 @@ async function renameImage(imageName: string, imageTag: string) {
     <Button
       class="pcol-start-3"
       type="link"
-      on:click={() => {
-        closeCallback();
-      }}>Cancel</Button>
+      on:click={closeCallback}>Cancel</Button>
     <Button
       class="col-start-4"
       disabled={disableSave(imageName, imageTag)}
-      on:click={async () => {
+      on:click={async (): Promise<void> => {
         await renameImage(imageName, imageTag);
       }}>Save</Button>
   </svelte:fragment>

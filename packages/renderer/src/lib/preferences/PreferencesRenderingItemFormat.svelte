@@ -16,12 +16,12 @@ import { getInitialValue, getNormalizedDefaultNumberValue } from './Util';
 
 interface Props {
   record: IConfigurationPropertyRecordedSchema;
-  initialValue: Promise<any>;
+  initialValue: Promise<unknown>;
   givenValue?: unknown;
   setRecordValue?: (id: string, value: string | boolean | number) => void;
   invalidRecord?: (error: string) => void;
   validRecord?: () => void;
-  updateResetButtonVisibility?: (recordValue: any) => void;
+  updateResetButtonVisibility?: (recordValue: unknown) => void;
   resetToDefault?: boolean;
   enableAutoSave?: boolean;
   enableSlider?: boolean;
@@ -31,10 +31,10 @@ let {
   record,
   initialValue,
   givenValue,
-  setRecordValue = () => {},
-  invalidRecord = () => {},
-  validRecord = () => {},
-  updateResetButtonVisibility = () => {},
+  setRecordValue = (): void => {},
+  invalidRecord = (): void => {},
+  validRecord = (): void => {},
+  updateResetButtonVisibility = (): void => {},
   resetToDefault = false,
   enableAutoSave = false,
   enableSlider = false,
@@ -44,7 +44,7 @@ let currentRecord: IConfigurationPropertyRecordedSchema;
 let recordUpdateTimeout: NodeJS.Timeout;
 
 let invalidText: string | undefined = $state(undefined);
-let recordValue: string | boolean | number | undefined = $state(undefined);
+let recordValue: unknown = $state(undefined);
 
 $effect(() => {
   updateResetButtonVisibility?.(recordValue);
@@ -55,10 +55,11 @@ let callbackId: string | undefined = undefined;
 onMount(() => {
   if (record.id && record.scope === 'DEFAULT') {
     callbackId = record.id;
-    callBack = () => {
+    callBack = (): void => {
       getInitialValue(record)
         .then(v => {
-          if (v) {
+          // v may be `false` which is a valid value for boolean types
+          if (v !== undefined) {
             recordValue = v;
           }
         })
@@ -101,7 +102,7 @@ $effect(() => {
   }
 });
 
-async function update(record: IConfigurationPropertyRecordedSchema) {
+async function update(record: IConfigurationPropertyRecordedSchema): Promise<void> {
   // save the value
   if (record.id && isEqual(currentRecord, record)) {
     try {
@@ -114,7 +115,7 @@ async function update(record: IConfigurationPropertyRecordedSchema) {
   }
 }
 
-function isEqual(first: IConfigurationPropertyRecordedSchema, second: IConfigurationPropertyRecordedSchema) {
+function isEqual(first: IConfigurationPropertyRecordedSchema, second: IConfigurationPropertyRecordedSchema): boolean {
   return JSON.stringify(first) === JSON.stringify(second);
 }
 
@@ -129,7 +130,7 @@ function autoSave(): Promise<void> {
   return Promise.resolve();
 }
 
-function ensureType(value: any): boolean {
+function ensureType(value: unknown): boolean {
   switch (typeof value) {
     case 'boolean':
       return record.type === 'boolean';

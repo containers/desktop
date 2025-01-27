@@ -46,6 +46,8 @@ import { app, BrowserWindow, clipboard, ipcMain, shell } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron/main';
 
 import type { KubernetesGeneratorInfo } from '/@/plugin/api/KubernetesGeneratorInfo.js';
+import { ExtensionLoader } from '/@/plugin/extension/extension-loader.js';
+import { ExtensionWatcher } from '/@/plugin/extension/extension-watcher.js';
 import type {
   GenerateKubeResult,
   KubernetesGeneratorArgument,
@@ -77,6 +79,7 @@ import type { ContainerInspectInfo } from '/@api/container-inspect-info.js';
 import type { ContainerStatsInfo } from '/@api/container-stats-info.js';
 import type { ContributionInfo } from '/@api/contribution-info.js';
 import type { DockerSocketMappingStatusInfo } from '/@api/docker-compatibility-info.js';
+import type { ExtensionDevelopmentFolderInfo } from '/@api/extension-development-folders-info.js';
 import type { ExtensionInfo } from '/@api/extension-info.js';
 import type { GitHubIssue } from '/@api/feedback.js';
 import type { HistoryInfo } from '/@api/history-info.js';
@@ -91,6 +94,8 @@ import type { ContextHealth } from '/@api/kubernetes-contexts-healths.js';
 import type { ContextPermission } from '/@api/kubernetes-contexts-permissions.js';
 import type { ContextGeneralState, ResourceName } from '/@api/kubernetes-contexts-states.js';
 import type { ForwardConfig, ForwardOptions } from '/@api/kubernetes-port-forward-model.js';
+import type { ResourceCount } from '/@api/kubernetes-resource-count.js';
+import type { KubernetesContextResources } from '/@api/kubernetes-resources.js';
 import type { ManifestCreateOptions, ManifestInspectInfo, ManifestPushOptions } from '/@api/manifest-info.js';
 import type { NetworkInspectInfo } from '/@api/network-info.js';
 import type { NotificationCard, NotificationCardOptions } from '/@api/notification.js';
@@ -143,10 +148,11 @@ import type {
 } from './dockerode/libpod-dockerode.js';
 import { EditorInit } from './editor-init.js';
 import type { Emitter } from './events/emitter.js';
-import { ExtensionLoader } from './extension-loader.js';
-import { ExtensionsCatalog } from './extensions-catalog/extensions-catalog.js';
-import type { CatalogExtension } from './extensions-catalog/extensions-catalog-api.js';
-import { ExtensionsUpdater } from './extensions-updater/extensions-updater.js';
+import { ExtensionsCatalog } from './extension/catalog/extensions-catalog.js';
+import type { CatalogExtension } from './extension/catalog/extensions-catalog-api.js';
+import { ExtensionAnalyzer } from './extension/extension-analyzer.js';
+import { ExtensionDevelopmentFolders } from './extension/extension-development-folders.js';
+import { ExtensionsUpdater } from './extension/updater/extensions-updater.js';
 import { Featured } from './featured/featured.js';
 import type { FeaturedExtension } from './featured/featured-api.js';
 import { FeedbackHandler } from './feedback-handler.js';
@@ -159,6 +165,7 @@ import { InputQuickPickRegistry } from './input-quickpick/input-quickpick-regist
 import { ExtensionInstaller } from './install/extension-installer.js';
 import { KubernetesClient } from './kubernetes/kubernetes-client.js';
 import { downloadGuideList } from './learning-center/learning-center.js';
+import { LearningCenterInit } from './learning-center-init.js';
 import { LibpodApiInit } from './libpod-api-enable/libpod-api-init.js';
 import type { MessageBoxOptions, MessageBoxReturnValue } from './message-box.js';
 import { MessageBox } from './message-box.js';
@@ -553,7 +560,7 @@ export class PluginSystem {
       }
     });
 
-    statusBarRegistry.setEntry('help', false, -1, undefined, 'Help', 'fa fa-question-circle', true, 'help', undefined);
+    statusBarRegistry.setEntry('help', false, -1, undefined, 'Help', 'fa fa-question-circle', true, 'help');
 
     statusBarRegistry.setEntry(
       'troubleshooting',
@@ -564,7 +571,6 @@ export class PluginSystem {
       'fa fa-lightbulb',
       true,
       'troubleshooting',
-      undefined,
     );
 
     statusBarRegistry.setEntry(
@@ -576,7 +582,6 @@ export class PluginSystem {
       'fa fa-comment',
       true,
       'feedback',
-      undefined,
     );
 
     // Init update logic
@@ -611,6 +616,9 @@ export class PluginSystem {
 
     const releaseNotesBannerConfiguration = new ReleaseNotesBannerInit(configurationRegistry);
     releaseNotesBannerConfiguration.init();
+
+    const learningCenterConfiguration = new LearningCenterInit(configurationRegistry);
+    learningCenterConfiguration.init();
 
     const terminalInit = new TerminalInit(configurationRegistry);
     terminalInit.init();
@@ -664,6 +672,16 @@ export class PluginSystem {
       onboardingRegistry,
     );
 
+    const extensionAnalyzer = new ExtensionAnalyzer();
+
+    const extensionWatcher = new ExtensionWatcher(fileSystemMonitoring);
+    const extensionDevelopmentFolders = new ExtensionDevelopmentFolders(
+      configurationRegistry,
+      extensionAnalyzer,
+      apiSender,
+    );
+    extensionDevelopmentFolders.init();
+
     this.extensionLoader = new ExtensionLoader(
       commandRegistry,
       menuRegistry,
@@ -700,6 +718,9 @@ export class PluginSystem {
       dialogRegistry,
       safeStorageRegistry,
       certificates,
+      extensionWatcher,
+      extensionDevelopmentFolders,
+      extensionAnalyzer,
     );
     await this.extensionLoader.init();
 
@@ -1101,9 +1122,22 @@ export class PluginSystem {
     this.ipcHandle(
       'container-provider-registry:pushImage',
       async (_listener, engine: string, imageId: string, callbackId: number): Promise<void> => {
-        return containerProviderRegistry.pushImage(engine, imageId, (name: string, data: string) => {
-          this.getWebContentsSender().send('container-provider-registry:pushImage-onData', callbackId, name, data);
+        const msgName = 'container-provider-registry:pushImage-onData';
+        const task = taskManager.createTask({
+          title: `Push image '${imageId}'`,
         });
+        return containerProviderRegistry
+          .pushImage(engine, imageId, (name: string, data: string) => {
+            this.getWebContentsSender().send(msgName, callbackId, name, data);
+          })
+          .then(() => {
+            task.status = 'success';
+          })
+          .catch((error: unknown) => {
+            task.error = String(error);
+            this.getWebContentsSender().send(msgName, callbackId, 'error', String(error));
+            this.getWebContentsSender().send(msgName, callbackId, 'end');
+          });
       },
     );
     this.ipcHandle(
@@ -2451,7 +2485,6 @@ export class PluginSystem {
       },
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.ipcHandle(
       'kubernetes-client:createResourcesFromFile',
       async (_listener, context: string, file: string, namespace: string): Promise<void> => {
@@ -2584,6 +2617,17 @@ export class PluginSystem {
     this.ipcHandle('kubernetes:getContextsPermissions', async (_listener): Promise<ContextPermission[]> => {
       return kubernetesClient.getContextsPermissions();
     });
+
+    this.ipcHandle('kubernetes:getResourcesCount', async (_listener): Promise<ResourceCount[]> => {
+      return kubernetesClient.getResourcesCount();
+    });
+
+    this.ipcHandle(
+      'kubernetes:getResources',
+      async (_listener, resourceName: string): Promise<KubernetesContextResources[]> => {
+        return kubernetesClient.getResources(resourceName);
+      },
+    );
 
     const kubernetesExecCallbackMap = new Map<
       number,
@@ -2865,6 +2909,27 @@ export class PluginSystem {
     this.ipcHandle('path:relative', async (_listener, from: string, to: string): Promise<string> => {
       return path.relative(from, to);
     });
+
+    this.ipcHandle(
+      'extension-development-folders:getDevelopmentFolders',
+      async (): Promise<ExtensionDevelopmentFolderInfo[]> => {
+        return extensionDevelopmentFolders.getDevelopmentFolders();
+      },
+    );
+
+    this.ipcHandle(
+      'extension-development-folders:addDevelopmentFolder',
+      async (_listener: unknown, path: string): Promise<void> => {
+        return extensionDevelopmentFolders.addDevelopmentFolder(path);
+      },
+    );
+
+    this.ipcHandle(
+      'extension-development-folders:removeDevelopmentFolder',
+      async (_listener: unknown, path: string): Promise<void> => {
+        return extensionDevelopmentFolders.removeDevelopmentFolder(path);
+      },
+    );
 
     const dockerDesktopInstallation = new DockerDesktopInstallation(
       apiSender,

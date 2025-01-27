@@ -17,23 +17,25 @@
  ***********************************************************************/
 
 import { ResourceElementActions } from '../model/core/operations';
-import { ContainerState, ResourceElementState } from '../model/core/states';
+import { ResourceElementState } from '../model/core/states';
 import { ResourceConnectionCardPage } from '../model/pages/resource-connection-card-page';
 import { ResourcesPage } from '../model/pages/resources-page';
-import { VolumesPage } from '../model/pages/volumes-page';
-import { expect as playExpect, test } from '../utility/fixtures';
 import {
+  checkClusterResources,
   createKindCluster,
-  deleteKindCluster,
-  ensureCliInstalled,
-  getVolumeNameForContainer,
-} from '../utility/operations';
+  deleteCluster,
+  deleteClusterFromDetails,
+  resourceConnectionAction,
+  resourceConnectionActionDetails,
+} from '../utility/cluster-operations';
+import { expect as playExpect, test } from '../utility/fixtures';
+import { ensureCliInstalled } from '../utility/operations';
 import { waitForPodmanMachineStartup } from '../utility/wait';
 
 const RESOURCE_NAME: string = 'kind';
 const EXTENSION_LABEL: string = 'podman-desktop.kind';
 const CLUSTER_NAME: string = 'kind-cluster';
-const KIND_CONTAINER_NAME: string = `${CLUSTER_NAME}-control-plane`;
+const KIND_NODE: string = `${CLUSTER_NAME}-control-plane`;
 const CLUSTER_CREATION_TIMEOUT: number = 300_000;
 let resourcesPage: ResourcesPage;
 
@@ -51,9 +53,7 @@ test.beforeAll(async ({ runner, page, welcomePage }) => {
 
 test.afterAll(async ({ runner, page }) => {
   try {
-    if (!(process.env.GITHUB_ACTIONS && process.env.RUNNER_OS === 'Linux')) {
-      await deleteKindCluster(page, KIND_CONTAINER_NAME, CLUSTER_NAME);
-    }
+    await deleteCluster(page, RESOURCE_NAME, KIND_NODE, CLUSTER_NAME);
   } finally {
     await runner.close();
   }
@@ -86,7 +86,11 @@ test.describe.serial('Kind End-to-End Tests', { tag: '@k8s_e2e' }, () => {
         await playExpect.poll(async () => resourcesPage.resourceCardIsVisible(RESOURCE_NAME)).toBeTruthy();
       });
     });
-  test.describe('Kind cluster operations', () => {
+  test.describe('Kind cluster validation tests', () => {
+    test.skip(
+      !!process.env.GITHUB_ACTIONS && process.env.RUNNER_OS === 'Linux',
+      'Tests suite should not run on Linux platform',
+    );
     test('Create a Kind cluster', async ({ page }) => {
       test.setTimeout(CLUSTER_CREATION_TIMEOUT);
       if (process.env.GITHUB_ACTIONS && process.env.RUNNER_OS === 'Linux') {
@@ -96,51 +100,82 @@ test.describe.serial('Kind End-to-End Tests', { tag: '@k8s_e2e' }, () => {
       }
     });
 
-    test('Check resources added with the Kind cluster', async ({ page, navigationBar }) => {
-      const containersPage = await navigationBar.openContainers();
-      await playExpect.poll(async () => containersPage.containerExists(KIND_CONTAINER_NAME)).toBeTruthy();
-      const containerDetailsPage = await containersPage.openContainersDetails(KIND_CONTAINER_NAME);
-      await playExpect.poll(async () => await containerDetailsPage.getState()).toEqual(ContainerState.Running);
-
-      const volumesPage = new VolumesPage(page);
-      const volumeName = await getVolumeNameForContainer(page, KIND_CONTAINER_NAME);
-      if (!volumeName) {
-        throw new Error(`Volume name for container "${KIND_CONTAINER_NAME}" is not defined.`);
-      }
-      const volumeDetailsPage = await volumesPage.openVolumeDetails(volumeName);
-      await playExpect.poll(async () => await volumeDetailsPage.isUsed()).toBeTruthy();
+    test('Check resources added with the Kind cluster', async ({ page }) => {
+      await checkClusterResources(page, KIND_NODE);
     });
 
-    test('Kind cluster operations - STOP', async ({ navigationBar }) => {
-      await navigationBar.openSettings();
-      await playExpect(kindResourceCard.resourceElementConnectionStatus).toHaveText(ResourceElementState.Running);
-      await kindResourceCard.performConnectionAction(ResourceElementActions.Stop);
-      await playExpect(kindResourceCard.resourceElementConnectionStatus).toHaveText(ResourceElementState.Off, {
-        timeout: 50000,
-      });
+    test('Kind cluster operations - STOP', async ({ page }) => {
+      await resourceConnectionAction(page, kindResourceCard, ResourceElementActions.Stop, ResourceElementState.Off);
     });
 
-    test('Kind cluster operations - START', async () => {
-      await kindResourceCard.performConnectionAction(ResourceElementActions.Start);
-      await playExpect(kindResourceCard.resourceElementConnectionStatus).toHaveText(ResourceElementState.Running, {
-        timeout: 50000,
-      });
+    test('Kind cluster operations - START', async ({ page }) => {
+      await resourceConnectionAction(
+        page,
+        kindResourceCard,
+        ResourceElementActions.Start,
+        ResourceElementState.Running,
+      );
     });
 
-    test('Kind cluster operatioms - RESTART', async () => {
-      await kindResourceCard.performConnectionAction(ResourceElementActions.Restart);
-      const stopButton = kindResourceCard.resourceElementConnectionActions.getByRole('button', {
-        name: ResourceElementActions.Stop,
-        exact: true,
-      });
-      await playExpect(stopButton).toBeEnabled({ timeout: 25_000 });
-      await playExpect(kindResourceCard.resourceElementConnectionStatus).toHaveText(ResourceElementState.Running, {
-        timeout: 50000,
-      });
+    test('Kind cluster operations - RESTART', async ({ page }) => {
+      await resourceConnectionAction(
+        page,
+        kindResourceCard,
+        ResourceElementActions.Restart,
+        ResourceElementState.Running,
+      );
     });
 
     test('Kind cluster operations - DELETE', async ({ page }) => {
-      await deleteKindCluster(page, KIND_CONTAINER_NAME, CLUSTER_NAME);
+      await deleteCluster(page, RESOURCE_NAME, KIND_NODE, CLUSTER_NAME);
+    });
+  });
+  test.describe('Kind cluster operations - Details', () => {
+    test.skip(
+      !!process.env.GITHUB_ACTIONS && process.env.RUNNER_OS === 'Linux',
+      'Tests suite should not run on Linux platform',
+    );
+    test('Create a Kind cluster', async ({ page }) => {
+      test.setTimeout(CLUSTER_CREATION_TIMEOUT);
+      if (process.env.GITHUB_ACTIONS && process.env.RUNNER_OS === 'Linux') {
+        await createKindCluster(page, CLUSTER_NAME, false, CLUSTER_CREATION_TIMEOUT, { useIngressController: false });
+      } else {
+        await createKindCluster(page, CLUSTER_NAME, true, CLUSTER_CREATION_TIMEOUT);
+      }
+    });
+
+    test('Kind cluster operations details - STOP', async ({ page }) => {
+      await resourceConnectionActionDetails(
+        page,
+        kindResourceCard,
+        CLUSTER_NAME,
+        ResourceElementActions.Stop,
+        ResourceElementState.Off,
+      );
+    });
+
+    test('Kind cluster operations details - START', async ({ page }) => {
+      await resourceConnectionActionDetails(
+        page,
+        kindResourceCard,
+        CLUSTER_NAME,
+        ResourceElementActions.Start,
+        ResourceElementState.Running,
+      );
+    });
+
+    test('Kind cluster operations details - RESTART', async ({ page }) => {
+      await resourceConnectionActionDetails(
+        page,
+        kindResourceCard,
+        CLUSTER_NAME,
+        ResourceElementActions.Restart,
+        ResourceElementState.Running,
+      );
+    });
+
+    test('Kind cluster operations details - DELETE', async ({ page }) => {
+      await deleteClusterFromDetails(page, RESOURCE_NAME, KIND_NODE, CLUSTER_NAME);
     });
   });
 });

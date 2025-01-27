@@ -81,7 +81,7 @@ vi.mock('/@/stores/kubernetes-contexts-state', async () => {
 });
 
 const dispatchEventMock = vi.fn();
-const messages = new Map<string, (args: any) => void>();
+const messages = new Map<string, (args: unknown) => void>();
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -91,7 +91,7 @@ beforeEach(() => {
       messages.set(channel, func);
     }),
   };
-  (window as any).dispatchEvent = dispatchEventMock;
+  Object.defineProperty(window, 'dispatchEvent', { value: dispatchEventMock });
   (window.getConfigurationValue as unknown) = vi.fn();
   vi.mocked(kubeContextStore).kubernetesCurrentContextState = readable({
     reachable: false,
@@ -150,7 +150,7 @@ test('opens submenu when a `submenu` menu is opened', async () => {
       link: '/tosubmenu',
       tooltip: 'With submenu',
       type: 'submenu',
-      get counter() {
+      get counter(): number {
         return 0;
       },
       items: [{} as NavigationRegistryEntry],

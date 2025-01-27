@@ -2,8 +2,8 @@
 sidebar_position: 2
 title: Installing the CLI
 description: Kind is one way to get Kubernetes running on your workstation.
-keywords: [podman desktop, podman, containers, migrating, kubernetes, kind]
-tags: [migrating-to-kubernetes, kind]
+keywords: [podman desktop, podman, containers, installing CLI, kubernetes, kind]
+tags: [installing-the-kind-CLI, kind]
 ---
 
 # Installing the `kind` CLI

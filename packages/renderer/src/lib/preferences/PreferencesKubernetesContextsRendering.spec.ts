@@ -20,7 +20,7 @@ import '@testing-library/jest-dom/vitest';
 
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { readable } from 'svelte/store';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { kubernetesContextsHealths } from '/@/stores/kubernetes-context-health';
 import { kubernetesContexts } from '/@/stores/kubernetes-contexts';
@@ -69,15 +69,27 @@ const mockContext3: KubeContext = {
   },
 };
 
+const kubernetesGetCurrentContextNameMock = vi.fn();
+
+const showMessageBoxMock = vi.fn();
+
+beforeAll(() => {
+  Object.defineProperty(window, 'kubernetesGetContextsGeneralState', {
+    value: vi.fn().mockResolvedValue(new Map<string, ContextGeneralState>()),
+  });
+  Object.defineProperty(window, 'kubernetesGetCurrentContextName', { value: kubernetesGetCurrentContextNameMock });
+  Object.defineProperty(window, 'showMessageBox', { value: showMessageBoxMock });
+});
+
 beforeEach(() => {
   kubernetesContexts.set([mockContext1, mockContext2, mockContext3]);
-  (window as any).kubernetesGetContextsGeneralState = vi.fn().mockResolvedValue(new Map<string, ContextGeneralState>());
+  vi.clearAllMocks();
 });
 
 test('test that name, cluster and the server is displayed when rendering', async () => {
   vi.mocked(kubernetesContextsState).kubernetesContextsState = readable<Map<string, ContextGeneralState>>(new Map());
   vi.mocked(kubernetesContextsState).kubernetesContextsCheckingStateDelayed = readable<Map<string, boolean>>(new Map());
-  (window as any).kubernetesGetCurrentContextName = vi.fn().mockResolvedValue('my-current-context');
+  kubernetesGetCurrentContextNameMock.mockResolvedValue('my-current-context');
   render(PreferencesKubernetesContextsRendering, {});
   expect(await screen.findByText('context-name')).toBeInTheDocument();
   expect(await screen.findByText('cluster-name')).toBeInTheDocument();
@@ -103,7 +115,7 @@ test('If nothing is returned for contexts, expect that the page shows a message'
 test('Test that context-name2 is the current context', async () => {
   vi.mocked(kubernetesContextsState).kubernetesContextsState = readable<Map<string, ContextGeneralState>>(new Map());
   vi.mocked(kubernetesContextsState).kubernetesContextsCheckingStateDelayed = readable<Map<string, boolean>>(new Map());
-  (window as any).kubernetesGetCurrentContextName = vi.fn().mockResolvedValue('context-name2');
+  kubernetesGetCurrentContextNameMock.mockResolvedValue('context-name2');
   render(PreferencesKubernetesContextsRendering, {});
 
   // Get current-context by aria label
@@ -121,8 +133,6 @@ test('Test that context-name2 is the current context', async () => {
 test('when deleting the current context, a popup should ask confirmation', async () => {
   vi.mocked(kubernetesContextsState).kubernetesContextsState = readable<Map<string, ContextGeneralState>>(new Map());
   vi.mocked(kubernetesContextsState).kubernetesContextsCheckingStateDelayed = readable<Map<string, boolean>>(new Map());
-  const showMessageBoxMock = vi.fn();
-  (window as any).showMessageBox = showMessageBoxMock;
   showMessageBoxMock.mockResolvedValue({ result: 1 });
 
   render(PreferencesKubernetesContextsRendering, {});
@@ -141,8 +151,6 @@ test('when deleting the current context, a popup should ask confirmation', async
 test('when deleting the non current context, no popup should ask confirmation', async () => {
   vi.mocked(kubernetesContextsState).kubernetesContextsState = readable<Map<string, ContextGeneralState>>(new Map());
   vi.mocked(kubernetesContextsState).kubernetesContextsCheckingStateDelayed = readable<Map<string, boolean>>(new Map());
-  const showMessageBoxMock = vi.fn();
-  (window as any).showMessageBox = showMessageBoxMock;
   showMessageBoxMock.mockResolvedValue({ result: 1 });
 
   render(PreferencesKubernetesContextsRendering, {});
@@ -165,10 +173,12 @@ describe.each([
       health: true,
       resourcesCount: false,
     },
-    initMocks: () => {
+    initMocks: (): void => {
       Object.defineProperty(global, 'window', {
         value: {
           getConfigurationValue: vi.fn(),
+          telemetryTrack: vi.fn(),
+          kubernetesRefreshContextState: vi.fn(),
         },
       });
       vi.mocked(window.getConfigurationValue<boolean>).mockResolvedValue(true);
@@ -192,7 +202,7 @@ describe.each([
       health: true,
       resourcesCount: true,
     },
-    initMocks: () => {
+    initMocks: (): void => {
       const state: Map<string, ContextGeneralState> = new Map();
       state.set('context-name', {
         reachable: true,
@@ -229,7 +239,7 @@ describe.each([
     expect(within(context1).queryByText('DEPLOYMENTS')).toBeInTheDocument();
 
     if (implemented.resourcesCount) {
-      const checkCount = (el: HTMLElement, label: string, count: number) => {
+      const checkCount = (el: HTMLElement, label: string, count: number): void => {
         const countEl = within(el).getByLabelText(label);
         expect(countEl).toBeInTheDocument();
         expect(within(countEl).queryByText(count)).toBeTruthy();
@@ -249,4 +259,64 @@ describe.each([
     const deploymentsCountContext2 = within(context2).queryByLabelText('Context Deployments Count');
     expect(deploymentsCountContext2).not.toBeInTheDocument();
   });
+});
+
+test('Connect button is displayed on contexts for which state is not known', () => {
+  const state: Map<string, ContextGeneralState> = new Map();
+  state.set('context-name', {
+    reachable: true,
+    resources: {
+      pods: 1,
+      deployments: 2,
+    },
+  });
+  state.set('context-name2', {
+    reachable: false,
+    resources: {
+      pods: 0,
+      deployments: 0,
+    },
+  });
+  vi.mocked(kubernetesContextsState).kubernetesContextsState = readable<Map<string, ContextGeneralState>>(state);
+  vi.mocked(kubernetesContextsState).kubernetesContextsCheckingStateDelayed = readable<Map<string, boolean>>(new Map());
+  render(PreferencesKubernetesContextsRendering, {});
+  const context3 = screen.getAllByRole('row')[2];
+
+  expect(within(context3).queryByText('UNKNOWN')).toBeInTheDocument();
+  expect(within(context3).queryByText('PODS')).not.toBeInTheDocument();
+  expect(within(context3).queryByText('DEPLOYMENTS')).not.toBeInTheDocument();
+  expect(within(context3).queryByText('Connect')).toBeInTheDocument();
+
+  const context1 = screen.getAllByRole('row')[0];
+  expect(within(context1).queryByText('Connect')).not.toBeInTheDocument();
+  const context2 = screen.getAllByRole('row')[1];
+  expect(within(context2).queryByText('Connect')).not.toBeInTheDocument();
+});
+
+test('Connecting for a context calls window.kubernetesRefreshContextState with context name', async () => {
+  const state: Map<string, ContextGeneralState> = new Map();
+  vi.mocked(kubernetesContextsState).kubernetesContextsState = readable<Map<string, ContextGeneralState>>(state);
+  vi.mocked(kubernetesContextsState).kubernetesContextsCheckingStateDelayed = readable<Map<string, boolean>>(new Map());
+  render(PreferencesKubernetesContextsRendering, {});
+  const context1 = screen.getAllByRole('row')[0];
+
+  const button = within(context1).getByText('Connect');
+
+  vi.mocked(window.kubernetesRefreshContextState).mockResolvedValue(undefined);
+  await fireEvent.click(button);
+  expect(window.kubernetesRefreshContextState).toHaveBeenCalledWith('context-name');
+});
+
+test('Connecting for a context sends telemetry', async () => {
+  const state: Map<string, ContextGeneralState> = new Map();
+  vi.mocked(kubernetesContextsState).kubernetesContextsState = readable<Map<string, ContextGeneralState>>(state);
+  vi.mocked(kubernetesContextsState).kubernetesContextsCheckingStateDelayed = readable<Map<string, boolean>>(new Map());
+  render(PreferencesKubernetesContextsRendering, {});
+  const context2 = screen.getAllByRole('row')[1];
+
+  const button = within(context2).getByText('Connect');
+
+  vi.mocked(window.kubernetesRefreshContextState).mockResolvedValue(undefined);
+  await fireEvent.click(button);
+  expect(window.telemetryTrack).toHaveBeenCalledWith('kubernetes.monitoring.start.non-current');
 });

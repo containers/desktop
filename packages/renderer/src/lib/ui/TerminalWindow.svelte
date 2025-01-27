@@ -5,19 +5,35 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 
+import TerminalSearchControls from '/@/lib/ui/TerminalSearchControls.svelte';
+
 import { TerminalSettings } from '../../../../main/src/plugin/terminal-settings';
 import { getTerminalTheme } from '../../../../main/src/plugin/terminal-theme';
 
-export let terminal: Terminal;
-export let convertEol: boolean | undefined = undefined;
-export let disableStdIn: boolean = true;
-export let screenReaderMode: boolean | undefined = undefined;
-export let showCursor: boolean = false;
+interface Props {
+  terminal?: Terminal;
+  convertEol?: boolean;
+  disableStdIn?: boolean;
+  screenReaderMode?: boolean;
+  showCursor?: boolean;
+  search?: boolean;
+  class?: string;
+}
 
-let logsXtermDiv: HTMLDivElement;
+let {
+  terminal = $bindable(),
+  convertEol,
+  disableStdIn = true,
+  screenReaderMode,
+  showCursor = false,
+  search = false,
+  class: className,
+}: Props = $props();
+
+let logsXtermDiv: HTMLDivElement | undefined;
 let resizeHandler: () => void;
 
-const dispatch = createEventDispatcher<{ init: any }>();
+const dispatch = createEventDispatcher();
 
 async function refreshTerminal(): Promise<void> {
   // missing element, return
@@ -69,4 +85,7 @@ onDestroy(() => {
 });
 </script>
 
-<div class="{$$props.class} p-[5px] pr-0 bg-[var(--pd-terminal-background)]" bind:this={logsXtermDiv}></div>
+{#if search && terminal}
+  <TerminalSearchControls terminal={terminal} />
+{/if}
+<div class="{className} p-[5px] pr-0 bg-[var(--pd-terminal-background)]" role="term" bind:this={logsXtermDiv}></div>

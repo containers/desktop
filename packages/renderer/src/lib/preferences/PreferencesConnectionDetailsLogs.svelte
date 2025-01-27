@@ -28,7 +28,7 @@ let logsXtermDiv: HTMLDivElement;
 let resizeObserver: ResizeObserver;
 let termFit: FitAddon;
 
-async function refreshTerminal() {
+async function refreshTerminal(): Promise<void> {
   // missing element, return
   if (!logsXtermDiv) {
     console.log('missing xterm div, exiting...');
@@ -75,15 +75,15 @@ onMount(async () => {
 
   // Observe the terminal div
   resizeObserver.observe(logsXtermDiv);
-  const logHandler = (newContent: any[], colorPrefix: string) => {
+  const logHandler = (newContent: unknown[], colorPrefix: string): void => {
     writeToTerminal(logsTerminal, newContent, colorPrefix);
   };
   if (providerInternalId) {
     await window.startReceiveLogs(
       providerInternalId,
-      (data: any) => logHandler(data, '\x1b[37m'),
-      (data: any) => logHandler(data, '\x1b[37m'),
-      (data: any) => logHandler(data, '\x1b[37m'),
+      (data: unknown[]) => logHandler(data, '\x1b[37m'),
+      (data: unknown[]) => logHandler(data, '\x1b[37m'),
+      (data: unknown[]) => logHandler(data, '\x1b[37m'),
       connectionInfo,
     );
   }

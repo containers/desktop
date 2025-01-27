@@ -26,12 +26,13 @@ import { ipcMain } from 'electron';
 import * as tarFs from 'tar-fs';
 
 import type { Directories } from '/@/plugin/directories.js';
+import type { ExtensionsCatalog } from '/@/plugin/extension/catalog/extensions-catalog.js';
+import type { AnalyzedExtension } from '/@/plugin/extension/extension-analyzer.js';
+import type { ExtensionLoader } from '/@/plugin/extension/extension-loader.js';
 
 import type { ApiSenderType } from '../api.js';
 import type { ContributionManager } from '../contribution-manager.js';
 import { DockerDesktopContribution, DockerDesktopInstaller } from '../docker-extension/docker-desktop-installer.js';
-import type { AnalyzedExtension, ExtensionLoader } from '../extension-loader.js';
-import type { ExtensionsCatalog } from '../extensions-catalog/extensions-catalog.js';
 import type { ImageRegistry } from '../image-registry.js';
 import type { Telemetry } from '../telemetry/telemetry.js';
 
@@ -334,6 +335,7 @@ export class ExtensionInstaller {
 
     // load all extensions
     analyzedExtensions.forEach(extension => this.extensionLoader.ensureExtensionIsEnabled(extension.id));
+
     await this.extensionLoader.loadExtensions(analyzedExtensions);
 
     sendEnd('Extension Successfully installed.');

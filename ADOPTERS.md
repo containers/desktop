@@ -1,25 +1,23 @@
 # Podman Desktop Adopters
 
-Thank you to all the individuals, organizations, and projects that are using Podman Desktop! 
+Thank you to all the individuals, organizations, and projects that are using Podman Desktop!
 
 ### Contribution Guidelines
+
 If you're using Podman Desktop and want to add your organization to this list submit a pull request with your change. In your pull request, please include the following information:
-- **Name/Organization/Project name:** Clearly identify y adopter.
-- **Description:** Provide a brief description of what you are doing, your use(s) case(s), and how you are using Podman Desktop.
-- **Website or link:** Include a link to the adopter's website or project page, if applicable.
 
-Here's a sample to guide you for your PR:
-
-#### [Acme](https://acme.com/)
-
-[![Acme Logo](https://upload.wikimedia.org/wikipedia/commons/6/6e/Acme-corp.png)](https://acme.com/)
-
-Acme is a fictional company in the Warner Bros. Looney Tunes and Merrie Melodies series of cartoons. We have adopted Podman Desktop to help us build our next generation of products. Developers are using Podman Desktop to build images and test their applications. They are also using the "play kube" capabilities to test kubernetes services without having to spin up a local kubernetes environment.
+- **Name/Organization/Project name:** Clearly identify the adopter.
+- **Status:** Provide a status of your usage of the solution: ![production](https://img.shields.io/badge/-production-blue?style=flat), ![testing](https://img.shields.io/badge/-development%20&%20testing-green?style=flat).
+- **More Information:** Eventually include a link that points to more information about your usage of the solution.
 
 ## Organizations using Podman Desktop
 
 Below is a list of organizations that are using Podman Desktop.
 
+| Organization                     | Status                                                                  | More Information |
+| -------------------------------- | ----------------------------------------------------------------------- | ---------------- |
+| [SAMPLE Acme](https://acme.com/) | ![production](https://img.shields.io/badge/-production-blue?style=flat) |
+| [Amadeus](https://amadeus.com/) | ![production](https://img.shields.io/badge/-production-blue?style=flat) | Migration of 2k+ developers' container engines to Podman Desktop in Jan 2024. Regular collaboration with the Podman Desktop engineering team.
 
 ## Solutions built with Podman Desktop
 

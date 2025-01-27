@@ -19,7 +19,7 @@ Consider creating a custom Lima instance to:
 
 #### Prerequisites
 
-1. [Install the `lima` CLI](/docs/lima/installing).
+- [Install the `lima` CLI](/docs/lima/installing).
 
 #### Procedure
 
@@ -57,7 +57,7 @@ Consider creating a custom Lima instance to:
 
 2. Wait for the instance to start, and restart the Lima extension.
 
-   - Go to **<Icon icon="fa-solid fa-cog" size="lg" /> Settings > Preferences > Extension: Lima**, to change the instance name and type.
+   - Go to **<Icon icon="fa-solid fa-cog" size="lg" /> Settings > Preferences > Extension: Lima** to change the instance name and type.
 
      - Podman (default)
 
@@ -71,7 +71,7 @@ Consider creating a custom Lima instance to:
        - Name: docker
          ![Lima preferences Docker](img/lima-preferences-docker.png)
 
-   - Go to **<Icon icon="fa-solid fa-cog" size="lg" /> Settings > Preferences > Extension: Lima**, to configure a custom socket name.
+   - Go to **<Icon icon="fa-solid fa-cog" size="lg" /> Settings > Preferences > Extension: Lima** to configure a custom socket name.
 
      - The default socket name is:
 
@@ -83,7 +83,7 @@ Consider creating a custom Lima instance to:
 
        ![Lima preferences Socket](img/lima-preferences-socket.png)
 
-   - Go to **<Icon icon="fa-solid fa-cog" size="lg" /> Settings > Extensions > Lima**, to disable and enable the extension after changes.
+   - Go to **<Icon icon="fa-solid fa-cog" size="lg" /> Settings > Extensions > Lima** to disable or enable the extension after changes.
 
 #### Verification
 
