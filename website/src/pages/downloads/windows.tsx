@@ -117,7 +117,7 @@ export function WindowsDownloads(): JSX.Element {
           <div className="pt-8">
             <TelemetryLink
               className="mt-auto no-underline hover:no-underline inline-flex text-white hover:text-white bg-purple-500 border-0 py-2 px-6 focus:outline-none hover:bg-purple-500 rounded text-md font-semibold"
-              to={downloadData.setupX64}
+              href={downloadData.setupX64}
               eventTitle="download-windows">
               <span>
                 <FontAwesomeIcon size="1x" icon={faDownload} className="mr-2" />
@@ -136,7 +136,7 @@ export function WindowsDownloads(): JSX.Element {
               <div className="flex flex-row justify-center">
                 <TelemetryLink
                   className="underline inline-flex dark:text-white text-purple-500 hover:text-purple-200 py-2 px-3 font-semibold text-md"
-                  to={downloadData.setupX64}
+                  href={downloadData.setupX64}
                   eventTitle="download-windows">
                   <span>
                     <FontAwesomeIcon size="1x" icon={faDownload} className="mr-2" />
@@ -145,7 +145,7 @@ export function WindowsDownloads(): JSX.Element {
                 </TelemetryLink>
                 <TelemetryLink
                   className="underline inline-flex dark:text-white text-purple-500 hover:text-purple-200 py-2 px-3 font-semibold text-md"
-                  to={downloadData.setupArm64}
+                  href={downloadData.setupArm64}
                   eventTitle="download-windows">
                   <span>
                     <FontAwesomeIcon size="1x" icon={faDownload} className="mr-2" />
@@ -160,7 +160,7 @@ export function WindowsDownloads(): JSX.Element {
               <div className="flex flex-row justify-center">
                 <TelemetryLink
                   className="underline inline-flex dark:text-white text-purple-500 hover:text-purple-200 py-2 px-2 font-semibold text-md"
-                  to={downloadData.binaryX64}
+                  href={downloadData.binaryX64}
                   eventTitle="download-windows">
                   <span>
                     <FontAwesomeIcon size="1x" icon={faDownload} className="mr-2" />
@@ -169,7 +169,7 @@ export function WindowsDownloads(): JSX.Element {
                 </TelemetryLink>
                 <TelemetryLink
                   className="underline inline-flex dark:text-white text-purple-500 hover:text-purple-200 py-2 px-2 font-semibold text-md"
-                  to={downloadData.binaryArm64}
+                  href={downloadData.binaryArm64}
                   eventTitle="download-windows">
                   <span>
                     <FontAwesomeIcon size="1x" icon={faDownload} className="mr-2" />
@@ -184,7 +184,7 @@ export function WindowsDownloads(): JSX.Element {
               <div className="flex flex-row justify-center">
                 <TelemetryLink
                   className="underline inline-flex dark:text-white text-purple-500 hover:text-purple-200 py-2 px-6 font-semibold text-md"
-                  to={downloadData.airgapsetupX64}
+                  href={downloadData.airgapsetupX64}
                   eventTitle="download-windows">
                   <span>
                     <FontAwesomeIcon size="1x" icon={faDownload} className="mr-2" />
@@ -193,7 +193,7 @@ export function WindowsDownloads(): JSX.Element {
                 </TelemetryLink>
                 <TelemetryLink
                   className="underline inline-flex dark:text-white text-purple-500 hover:text-purple-200 py-2 px-6 font-semibold text-md"
-                  to={downloadData.airgapsetupArm64}
+                  href={downloadData.airgapsetupArm64}
                   eventTitle="download-windows">
                   <span>
                     <FontAwesomeIcon size="1x" icon={faDownload} className="mr-2" />

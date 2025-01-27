@@ -50,7 +50,7 @@ function DownloadClientLinks(): JSX.Element {
       <div>
         <TelemetryLink
           className="no-underline hover:no-underline inline-flex text-white hover:text-white bg-violet-600 border-0 py-4 px-8 mt-6 mb-1 focus:outline-none hover:bg-violet-700 rounded text-lg"
-          to={'/downloads/' + url}
+          href={'/downloads/' + url}
           eventTitle="landing-download-button-clicked">
           <span>
             <FontAwesomeIcon size="2x" icon={varIcon as IconProp} className="px-2" /> Download Now

@@ -1,7 +1,7 @@
 import Link from '@docusaurus/Link';
 
 type TelemetryLinkProps = {
-  to: string;
+  href: string;
   eventTitle: string;
   className: string;
   children?: JSX.Element;
@@ -19,7 +19,7 @@ export const TelemetryLink = (props: TelemetryLinkProps): JSX.Element => {
   return (
     <Link
       className={props.className}
-      to={props.to}
+      to={props.href}
       onClick={() => {
         sendGoatCounterEvent(props.eventTitle);
       }}>
