@@ -1,6 +1,8 @@
 <script lang="ts">
 import { Spinner } from '@podman-desktop/ui-svelte';
 
+import type { GroupItem } from './Typeahead';
+
 interface Props {
   placeholder?: string;
   required?: boolean;
@@ -10,8 +12,7 @@ interface Props {
   id?: string;
   name?: string;
   error?: boolean;
-  resultItems?: string[];
-  sort?: boolean;
+  resultItems?: GroupItem[];
   onInputChange?: (s: string) => Promise<void>;
   onChange?: (value: string) => void;
   onEnter?: () => void;
@@ -28,7 +29,6 @@ let {
   name,
   error = false,
   resultItems = [],
-  sort = false,
   onInputChange,
   onChange,
   onEnter,
@@ -40,9 +40,31 @@ let input: HTMLInputElement | undefined = $state();
 let list: HTMLDivElement | undefined = $state();
 let scrollElements: HTMLElement[] = $state([]);
 let value: string = $state('');
-let items: string[] = $derived(
-  sort
-    ? resultItems.toSorted((a: string, b: string) => {
+let items: string[] = $state([]);
+let itemHeadings: { [index: number]: string[] } = $state({});
+let opened: boolean = $state(false);
+let highlightIndex: number = $state(-1);
+let pageStep = 10;
+let userValue: string = '';
+let loading: boolean = $state(false);
+
+$effect(() => {
+  if (disabled) {
+    return;
+  }
+  let headings: { [index: number]: string[] } = {};
+  let currentItems: string[] = [];
+  for (let { values, group, sorted } of resultItems) {
+    if (group) {
+      if (headings[currentItems.length]) {
+        headings[currentItems.length].push(group);
+      } else {
+        headings[currentItems.length] = [group];
+      }
+    }
+    if (!sorted) {
+      // default sorting if the values are not already sorted
+      values = values.toSorted((a: string, b: string) => {
         if (a.startsWith(userValue) === b.startsWith(userValue)) {
           return a.localeCompare(b);
         } else if (a.startsWith(userValue) && !b.startsWith(userValue)) {
@@ -50,15 +72,13 @@ let items: string[] = $derived(
         } else {
           return 1;
         }
-      })
-    : resultItems,
-);
-let opened: boolean = $state(false);
-let highlightIndex: number = $state(-1);
-let pageStep: number = $state(10);
-let userValue: string = $state('');
-let loading: boolean = $state(false);
-
+      });
+    }
+    currentItems = currentItems.concat(values);
+  }
+  items = currentItems;
+  itemHeadings = headings;
+});
 function onItemSelected(s: string): void {
   value = s;
   userValue = s;
@@ -246,6 +266,11 @@ function onWindowClick(e: Event): void {
     bind:this={list}
     class="max-h-80 overflow-auto bg-[var(--pd-content-card-bg)] border-[var(--pd-input-field-hover-stroke)] border-[1px]">
     {#each items as item, i}
+      {#if itemHeadings[i]}
+        {#each itemHeadings[i] as heading}
+          <button class='p-[2px] text-[var(--pd-button-disabled-text)] w-full text-start' disabled>{heading}</button>
+        {/each}
+      {/if}
       <button
         bind:this={scrollElements[i]}
         class:bg-[var(--pd-content-card-hover-bg)]={i === highlightIndex}

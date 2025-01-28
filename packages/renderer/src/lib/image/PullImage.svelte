@@ -13,6 +13,7 @@ import type { PullEvent } from '/@api/pull-event';
 import { providerInfos } from '../../stores/providers';
 import EngineFormPage from '../ui/EngineFormPage.svelte';
 import TerminalWindow from '../ui/TerminalWindow.svelte';
+import type { GroupItem } from '../ui/Typeahead';
 import Typeahead from '../ui/Typeahead.svelte';
 import WarningMessage from '../ui/WarningMessage.svelte';
 import RecommendedRegistry from './RecommendedRegistry.svelte';
@@ -28,7 +29,7 @@ let shortnameImages: string[] = [];
 let podmanFQN = '';
 let usePodmanFQN = false;
 let isValidName = true;
-let searchResult: string[] = [];
+let searchResult: GroupItem[] = [];
 
 export let imageToPull: string | undefined = undefined;
 
@@ -249,7 +250,7 @@ function checkIfTagExist(image: string, tags: string[]): void {
 
 async function searchFunction(value: string): Promise<void> {
   try {
-    searchResult = (await searchImages(value)).toSorted((a: string, b: string) => {
+    const result = (await searchImages(value)).toSorted((a: string, b: string) => {
       const dockerIoValue = `docker.io/${value}`;
       const aStartsWithValue = a.startsWith(value) || a.startsWith(dockerIoValue);
       const bStartsWithValue = b.startsWith(value) || b.startsWith(dockerIoValue);
@@ -261,6 +262,7 @@ async function searchFunction(value: string): Promise<void> {
         return 1;
       }
     });
+    searchResult = [{ values: result, sorted: true }];
   } catch (error: unknown) {
     searchResult = [];
   }

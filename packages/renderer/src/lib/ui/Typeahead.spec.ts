@@ -22,6 +22,7 @@ import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 
+import type { GroupItem } from './Typeahead';
 import Typeahead from './Typeahead.svelte';
 
 window.HTMLElement.prototype.scrollIntoView = function (): void {};
@@ -84,16 +85,15 @@ test('initial focus is set with option', async () => {
 });
 
 test('should list the result after the delay, and display spinner during loading', async () => {
-  let searchResult: string[] = [];
+  let searchResult: GroupItem[] = [];
   const searchFunction = async (s: string): Promise<void> => {
     await new Promise(resolve => setTimeout(resolve, 100));
-    searchResult = [s + '01', s + '02', s + '03'];
+    searchResult = [{ values: [s + '01', s + '02', s + '03'] }];
   };
   const { rerender } = render(Typeahead, {
     initialFocus: true,
     onInputChange: searchFunction,
     resultItems: searchResult,
-    sort: true,
     delay: 10,
   });
 
@@ -124,16 +124,15 @@ test('should list the result after the delay, and display spinner during loading
 });
 
 test('should list items started with search term on top', async () => {
-  let searchResult: string[] = [];
+  let searchResult: GroupItem[] = [];
   const searchFunction = async (s: string): Promise<void> => {
     await new Promise(resolve => setTimeout(resolve, 100));
-    searchResult = ['z1' + s, s + '01', 'z0', s + '02', 'z2', s + '03'];
+    searchResult = [{ values: ['z1' + s, s + '01', 'z0', s + '02', 'z2', s + '03'] }];
   };
   const { rerender } = render(Typeahead, {
     initialFocus: true,
     onInputChange: searchFunction,
     resultItems: searchResult,
-    sort: true,
     delay: 10,
   });
 
@@ -156,19 +155,18 @@ test('should list items started with search term on top', async () => {
 });
 
 test('should navigate in list with keys', async () => {
-  let searchResult: string[] = [];
+  let searchResult: GroupItem[] = [];
   const searchFunction = async (s: string): Promise<void> => {
     const result: string[] = [];
     for (let i = 1; i <= 15; i++) {
       result.push(s + `${i}`.padStart(2, '0'));
     }
-    searchResult = result;
+    searchResult = [{ values: result }];
   };
   const { rerender } = render(Typeahead, {
     initialFocus: true,
     onInputChange: searchFunction,
     resultItems: searchResult,
-    sort: true,
     delay: 10,
   });
   const input = screen.getByRole('textbox');
@@ -272,4 +270,54 @@ test('should show error border', async () => {
   expect(parentInput).toHaveClass('border-b-[var(--pd-input-field-stroke-error)]');
   expect(parentInput).toHaveClass('focus-within:border-[var(--pd-input-field-stroke-error)]');
   expect(parentInput).not.toHaveClass('hover:border-b-[var(--pd-input-field-hover-stroke)]');
+});
+
+test('should include heading based on given order and searchFunctions order', async () => {
+  let searchResult: GroupItem[] = [];
+  const searchFunction = async (s: string): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const result1 = { values: [s + '11', s + '12', s + '13', s + '14'], group: 'searchFunction1 results' };
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const result2 = { values: [s + '21', s + '22', s + '23', s + '24'], group: 'searchFunction2 results' };
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const result3 = { values: [s + '31', s + '32', s + '33'], group: 'searchFunction3 results' };
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const result4 = { values: [s + '41', s + '42', s + '43', s + '44'] };
+
+    searchResult = [result1, result2, result3, result4];
+  };
+
+  const { rerender } = render(Typeahead, {
+    initialFocus: true,
+    onInputChange: searchFunction,
+    resultItems: searchResult,
+    delay: 10,
+  });
+
+  const input = screen.getByRole('textbox');
+
+  await userEvent.type(input, 'test');
+  await waitFor(() => expect(searchResult.length > 0).toBeTruthy());
+  await rerender({ resultItems: searchResult });
+
+  await tick();
+
+  await waitFor(() => {
+    const list = screen.getByRole('row');
+    const items = within(list).getAllByRole('button');
+    expect(items.length).toBe(18);
+    expect(items[0].textContent).toBe('searchFunction1 results');
+    expect(items[0]).toBeDisabled();
+    expect(items[1].textContent).toBe('test11');
+    expect(items[5].textContent).toBe('searchFunction2 results');
+    expect(items[5]).toBeDisabled();
+    expect(items[6].textContent).toBe('test21');
+    expect(items[10].textContent).toBe('searchFunction3 results');
+    expect(items[10]).toBeDisabled();
+    expect(items[11].textContent).toBe('test31');
+    expect(items[14].textContent).toBe('test41');
+  });
 });
