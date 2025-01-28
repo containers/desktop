@@ -83,6 +83,7 @@ let formEl: HTMLFormElement | undefined = $state();
 let connectionAuditResult: AuditResult | undefined = $state();
 let logsTerminal: Terminal | undefined = $state();
 
+let existingFormData: { [key: string]: unknown } | undefined;
 let operationFailed = false;
 let osMemory: string;
 let osCpu: string;
@@ -131,7 +132,9 @@ onMount(async () => {
       errorMessage = value.errorMessage;
       operationSuccessful = value.operationSuccessful;
       tokenId = value.tokenId;
+      existingFormData = value.formData;
     }
+    restoreConfigurationValues();
   }
 
   if (taskId === undefined) {
@@ -291,6 +294,29 @@ async function getConfigurationValue(configurationKey: IConfigurationPropertyRec
   }
 }
 
+function restoreConfigurationValues(): void {
+  if (!existingFormData) {
+    return;
+  }
+  for (let dataItem in existingFormData) {
+    const configurationKey = configurationKeys.find(configKey => configKey.id === dataItem);
+    if (
+      configurationKey?.type === 'number' &&
+      typeof existingFormData[dataItem] === 'string' &&
+      !isNaN(parseFloat(existingFormData[dataItem]))
+    ) {
+      existingFormData[dataItem] = parseFloat(existingFormData[dataItem]);
+    }
+    if (
+      typeof existingFormData[dataItem] === 'number' ||
+      typeof existingFormData[dataItem] === 'string' ||
+      typeof existingFormData[dataItem] === 'boolean'
+    ) {
+      configurationValues.set(dataItem, { modified: true, value: existingFormData[dataItem] });
+    }
+  }
+}
+
 function getLoggerHandler(): ConnectionCallback {
   return {
     log: (args): void => {
@@ -351,6 +377,7 @@ function updateStore(): void {
         operationStarted: operationStarted,
         errorMessage: errorMessage ?? '',
         tokenId,
+        formData: existingFormData,
       });
     }
     return map;
@@ -392,6 +419,7 @@ async function handleOnSubmit(e: SubmitEvent): Promise<void> {
     operationStarted = true;
     operationFailed = false;
     operationCancelled = false;
+    existingFormData = data;
 
     try {
       tokenId = await window.getCancellableTokenSource();
