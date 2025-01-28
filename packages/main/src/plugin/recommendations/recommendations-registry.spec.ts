@@ -25,7 +25,9 @@ import type { ExtensionLoader } from '/@/plugin/extension/extension-loader.js';
 import type { Featured } from '/@/plugin/featured/featured.js';
 import type { FeaturedExtension } from '/@/plugin/featured/featured-api.js';
 import type { ExtensionInfo } from '/@api/extension-info.js';
+import type { ProviderInfo } from '/@api/provider-info.js';
 
+import type { ProviderRegistry } from '../provider-registry.js';
 import { RecommendationsRegistry } from './recommendations-registry.js';
 
 let recommendationsRegistry: RecommendationsRegistry;
@@ -73,6 +75,10 @@ const extensionsCatalogMock = {
   getFetchableExtensions: vi.fn(),
 } as unknown as ExtensionsCatalog;
 
+const providerRegistryMock = {
+  getProviderInfos: vi.fn(),
+} as unknown as ProviderRegistry;
+
 const fakeNow = new Date(2020, 1, 1);
 
 beforeEach(() => {
@@ -80,12 +86,15 @@ beforeEach(() => {
   vi.useFakeTimers();
 
   vi.setSystemTime(fakeNow);
-
+  vi.mocked(providerRegistryMock.getProviderInfos).mockReturnValue([
+    { id: 'podman', status: 'ready' } as unknown as ProviderInfo,
+  ]);
   recommendationsRegistry = new RecommendationsRegistry(
     configurationRegistryMock,
     featuredMock,
     extensionLoaderMock,
     extensionsCatalogMock,
+    providerRegistryMock,
   );
 });
 
