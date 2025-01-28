@@ -375,7 +375,7 @@ export interface LibPod {
   resolveShortnameImage(shortname: string): Promise<{ Names: string[] }>;
   restartPod(podId: string): Promise<void>;
   generateKube(names: string[]): Promise<string>;
-  playKube(yamlContentFilePath: string): Promise<PlayKubeInfo>;
+  playKube(file: string | NodeJS.ReadableStream, options?: { build?: boolean }): Promise<PlayKubeInfo>;
   pruneAllImages(dangling: boolean): Promise<void>;
   podmanInfo(): Promise<Info>;
   getImages(options: GetImagesOptions): Promise<NodeJS.ReadableStream>;
@@ -792,11 +792,14 @@ export class LibpodDockerode {
     };
 
     // add playKube
-    prototypeOfDockerode.playKube = function (yamlContentFilePath: string): Promise<unknown> {
+    prototypeOfDockerode.playKube = function (
+      file: string | NodeJS.ReadableStream,
+      options?: { build?: boolean },
+    ): Promise<unknown> {
       const optsf = {
         path: '/v4.2.0/libpod/play/kube',
         method: 'POST',
-        file: yamlContentFilePath,
+        file: file,
         statusCodes: {
           200: true,
           204: true,
@@ -804,6 +807,10 @@ export class LibpodDockerode {
         },
         options: {},
       };
+
+      // if we don't build - we should send Content-Type application/yaml
+      // application/tar is not supported
+      const contentType = options?.build ? 'application/x-tar' : 'application/yaml';
 
       // patch the modem to not send x-tar header as content-type
       const originalBuildRequest = this.modem.buildRequest;
@@ -817,7 +824,7 @@ export class LibpodDockerode {
         if (context && typeof context === 'object' && 'path' in context) {
           if (String(context.path).includes('/libpod/play/kube')) {
             if (options && typeof options === 'object' && 'headers' in options) {
-              options.headers = { 'Content-Type': 'application/yaml' };
+              options.headers = { 'Content-Type': contentType };
             }
           }
         }
