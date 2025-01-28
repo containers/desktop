@@ -28,6 +28,7 @@ import {
 } from '/@/plugin/recommendations/recommendations-api.js';
 
 import { default as recommendations } from '../../../../../recommendations.json';
+import type { ProviderRegistry } from '../provider-registry.js';
 import { RecommendationsSettings } from './recommendations-settings.js';
 
 export class RecommendationsRegistry {
@@ -36,6 +37,7 @@ export class RecommendationsRegistry {
     private featured: Featured,
     private extensionLoader: ExtensionLoader,
     private extensionsCatalog: ExtensionsCatalog,
+    private providerRegistry: ProviderRegistry,
   ) {}
 
   isBannerRecommendationEnabled(): boolean {
@@ -117,7 +119,10 @@ export class RecommendationsRegistry {
       }
 
       const featured = featuredExtensions[extension.extensionId];
-      if (featured) {
+      const showRecommendation = this.providerRegistry
+        .getProviderInfos()
+        .find(info => info.status === 'ready' && info.id === 'podman');
+      if (featured && showRecommendation) {
         prev.push({
           ...extension,
           featured,

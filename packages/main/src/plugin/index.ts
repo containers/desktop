@@ -735,6 +735,7 @@ export class PluginSystem {
       featured,
       this.extensionLoader,
       extensionsCatalog,
+      providerRegistry,
     );
     recommendationsRegistry.init();
 
